@@ -1,21 +1,17 @@
-/* db.js — Dexie-backed database (layered schema)
+/* db.js — Dexie-backed database (layered schema v2)
  *
  * Requires: vendor/dexie.min.js loaded before this file
  *
- * Schema v2 — three stores:
+ * Schema v4 — four stores:
  *
- *   history   — recent searches (Layer 4 user data)
- *   bookmarks — saved words     (Layer 4 user data)
- *   wordCache — Layer 2/3 entry payloads cached after first API/file hit
- *               so they are available offline forever once viewed
+ *   wordIndex  — Layer 1: search index (word, pos, gender, hint) — seeded once
+ *   wordData   — Layer 2: full entries (l1, sources) — lazy populated
+ *   history    — Layer 4: recent searches (user data)
+ *   bookmarks  — Layer 4: saved words (user data)
  *
- * Entry shape (mirrors build-dict output):
- *   {
- *     id, w, pos, gender,
- *     meta: { freq, level },
- *     l1:  { en[], ex[] },
- *     sources: { freedict: { senses } }
- *   }
+ * Migration from v3:
+ *   - wordCache → wordData (renamed, same structure)
+ *   - wordIndex added (new, for search)
  */
 
 const db = new Dexie('urwort');
@@ -40,6 +36,24 @@ db.version(3).stores({
   history:   '++id, word, dir, ts, [word+dir]',
   bookmarks: 'id, word, dir, savedAt, [word+dir]',
   wordCache: 'id, word, dir, cachedAt',
+});
+
+// v4: add wordIndex (Layer 1) and rename wordCache → wordData (Layer 2)
+db.version(4).stores({
+  wordIndex: 'id, word, dir, pos, [word+dir]',  // Layer 1: search index
+  wordData:  'id, word, dir, cachedAt',         // Layer 2: full entries (renamed from wordCache)
+  history:   '++id, word, dir, ts, [word+dir]',
+  bookmarks: 'id, word, dir, savedAt, [word+dir]',
+}).upgrade(async (tx) => {
+  // Migrate wordCache → wordData
+  const oldCache = await tx.table('wordCache').toArray();
+  if (oldCache.length > 0) {
+    await tx.table('wordData').bulkPut(oldCache.map(row => ({
+      ...row,
+      // Ensure entry structure matches v2 format (no id/meta fields)
+    })));
+  }
+  // wordIndex will be populated by seeding (Step 3)
 });
 
 // ── History ──────────────────────────────────────────────────────────────────
@@ -101,28 +115,115 @@ async function bookmarksGetAll() {
   return db.bookmarks.orderBy('savedAt').reverse().toArray();
 }
 
-// ── Word cache (Layer 2 — offline-forever after first view) ──────────────────
+// ── Word Index (Layer 1 — search) ────────────────────────────────────────────
 
 /**
- * Cache a full entry after it's been loaded.
- * Called by app.js when a word detail is opened.
+ * Get a single word from the index. Returns null if not found.
+ * Used by history/bookmarks to get hint translations.
  */
-async function wordCachePut(entry, dir) {
-  return db.wordCache.put({
+async function wordIndexGet(word, dir) {
+  const row = await db.wordIndex.get(word + '|' + dir);
+  return row || null;
+}
+
+/**
+ * Query the index by prefix. Used for search.
+ * @param {string} query  — prefix to match (e.g. "sch")
+ * @param {string} dir    — 'de-en' | 'en-de'
+ * @param {number} limit  — max results (default 20)
+ */
+async function wordIndexQuery(query, dir, limit = 20) {
+  const q = query.trim();
+  if (q.length < 1) return [];
+  
+  // Simple prefix search (case-sensitive for now; will enhance in Step 4)
+  // For case-insensitive, we'll need to store wordLower as an indexed field
+  const results = await db.wordIndex
+    .where('word')
+    .startsWith(q)
+    .filter(row => row.dir === dir)
+    .limit(limit)
+    .toArray();
+  
+  // If no results and query is lowercase, try capitalized
+  if (results.length === 0 && q[0] >= 'a' && q[0] <= 'z') {
+    const qCap = q[0].toUpperCase() + q.slice(1);
+    return db.wordIndex
+      .where('word')
+      .startsWith(qCap)
+      .filter(row => row.dir === dir)
+      .limit(limit)
+      .toArray();
+  }
+  
+  return results;
+}
+
+/**
+ * Seed the index from JSON chunks. Called by seeding worker.
+ * @param {Array} entries  — array of index entries from chunk (format: {w, pos, gender, hint})
+ * @param {string} dir      — 'de-en' | 'en-de'
+ */
+async function wordIndexSeed(entries, dir) {
+  // Build rows with id = "word|dir"
+  const rows = entries.map(e => ({
+    id:     e.w + '|' + dir,
+    word:   e.w,
+    dir,
+    pos:    e.pos || '',
+    gender: e.gender || null,
+    hint:   e.hint || '',
+  }));
+  
+  // Bulk add (Dexie handles duplicates by id)
+  return db.wordIndex.bulkPut(rows);
+}
+
+// ── Word Data (Layer 2 — full entries, lazy populated) ────────────────────────
+
+/**
+ * Store a full entry. Called when a word detail is opened for the first time.
+ * @param {object} entry  — full entry with l1, sources
+ * @param {string} dir    — 'de-en' | 'en-de'
+ */
+async function wordDataPut(entry, dir) {
+  return db.wordData.put({
     id:       entry.w + '|' + dir,
     word:     entry.w,
     dir,
-    entry,
+    pos:      entry.pos || '',
+    gender:   entry.gender || null,
+    l1:       entry.l1 || { en: [], ex: [] },
+    sources:  entry.sources || {},
     cachedAt: Date.now(),
   });
 }
 
 /**
- * Retrieve a cached entry. Returns null if not in cache.
+ * Retrieve a full entry. Returns null if not cached.
  */
+async function wordDataGet(word, dir) {
+  const row = await db.wordData.get(word + '|' + dir);
+  if (!row) return null;
+  
+  // Return in the same format as build-dict output
+  return {
+    w:      row.word,
+    pos:    row.pos,
+    gender: row.gender,
+    l1:     row.l1,
+    sources: row.sources,
+  };
+}
+
+// ── Backward compatibility (deprecated, will be removed after Step 5) ──────────
+
 async function wordCacheGet(word, dir) {
-  const row = await db.wordCache.get(word + '|' + dir);
-  return row ? row.entry : null;
+  return wordDataGet(word, dir);
+}
+
+async function wordCachePut(entry, dir) {
+  return wordDataPut(entry, dir);
 }
 
 // ── Expose as global ──────────────────────────────────────────────────────────
@@ -137,7 +238,14 @@ window.DB = {
   bookmarkRemove,
   bookmarkExists,
   bookmarksGetAll,
-  // word cache
-  wordCachePut,
+  // word index (Layer 1)
+  wordIndexGet,
+  wordIndexQuery,
+  wordIndexSeed,
+  // word data (Layer 2)
+  wordDataGet,
+  wordDataPut,
+  // backward compatibility (deprecated)
   wordCacheGet,
+  wordCachePut,
 };
