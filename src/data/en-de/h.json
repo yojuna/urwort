@@ -1,0 +1,44 @@
+[
+  {
+    "w": "house",
+    "pos": "noun",
+    "gender": null,
+    "en": ["Haus", "Gebäude"],
+    "ex": ["The house is very large.", "We are going home."]
+  },
+  {
+    "w": "heart",
+    "pos": "noun",
+    "gender": null,
+    "en": ["Herz"],
+    "ex": ["The heart beats fast.", "She has a good heart."]
+  },
+  {
+    "w": "help",
+    "pos": "verb",
+    "gender": null,
+    "en": ["helfen", "unterstützen"],
+    "ex": ["Can you help me?", "He helps his mother."]
+  },
+  {
+    "w": "hear",
+    "pos": "verb",
+    "gender": null,
+    "en": ["hören", "vernehmen"],
+    "ex": ["I can hear music.", "Do you hear that?"]
+  },
+  {
+    "w": "hungry",
+    "pos": "adjective",
+    "gender": null,
+    "en": ["hungrig"],
+    "ex": ["I am very hungry.", "The hungry child ate quickly."]
+  },
+  {
+    "w": "hot",
+    "pos": "adjective",
+    "gender": null,
+    "en": ["heiß", "warm"],
+    "ex": ["It is hot today.", "The coffee is hot."]
+  }
+]

@@ -1,0 +1,25 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# Python (future data pipeline tooling)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Large generated data — real dictionary chunks go here,
+# committed separately or fetched by the build pipeline.
+# Remove these lines if you want to commit data into the repo.
+# src/data/de-en/
+# src/data/en-de/

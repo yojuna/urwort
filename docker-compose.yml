@@ -1,0 +1,10 @@
+services:
+  urwort:
+    build: .
+    container_name: urwort
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      # Live-reload src changes without rebuilding the image
+      - ./src:/usr/share/nginx/html:ro
+    restart: unless-stopped

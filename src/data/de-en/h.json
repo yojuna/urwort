@@ -1,0 +1,58 @@
+[
+  {
+    "w": "Haus",
+    "pos": "noun",
+    "gender": "n",
+    "en": ["house", "home", "building"],
+    "ex": ["Das Haus ist sehr groß.", "Wir gehen nach Hause."]
+  },
+  {
+    "w": "Hund",
+    "pos": "noun",
+    "gender": "m",
+    "en": ["dog"],
+    "ex": ["Der Hund bellt laut.", "Mein Hund heißt Max."]
+  },
+  {
+    "w": "haben",
+    "pos": "verb",
+    "gender": null,
+    "en": ["to have", "to possess"],
+    "ex": ["Ich habe einen Hund.", "Sie hat viel Geld."]
+  },
+  {
+    "w": "Herz",
+    "pos": "noun",
+    "gender": "n",
+    "en": ["heart"],
+    "ex": ["Das Herz schlägt schnell.", "Sie hat ein gutes Herz."]
+  },
+  {
+    "w": "hell",
+    "pos": "adjective",
+    "gender": null,
+    "en": ["bright", "light", "clear"],
+    "ex": ["Das Zimmer ist sehr hell.", "Die helle Sonne scheint."]
+  },
+  {
+    "w": "helfen",
+    "pos": "verb",
+    "gender": null,
+    "en": ["to help", "to assist", "to aid"],
+    "ex": ["Kannst du mir helfen?", "Er hilft seiner Mutter."]
+  },
+  {
+    "w": "Hunger",
+    "pos": "noun",
+    "gender": "m",
+    "en": ["hunger", "starvation"],
+    "ex": ["Ich habe großen Hunger.", "Der Hunger ist ein ernstes Problem."]
+  },
+  {
+    "w": "hören",
+    "pos": "verb",
+    "gender": null,
+    "en": ["to hear", "to listen"],
+    "ex": ["Ich höre Musik.", "Hörst du das?"]
+  }
+]

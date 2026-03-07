@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="description" content="Urwort — offline German ↔ English dictionary" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Urwort</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="icon" href="icons/icon-192.png" />
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <span class="app-logo">urwort</span>
+    <span class="app-tagline">de ↔ en</span>
+  </header>
+
+  <!-- Pages (only one visible at a time via hash routing) -->
+  <main class="app-main">
+
+    <!-- SEARCH PAGE -->
+    <section id="page-search" class="page active">
+      <div class="search-bar-wrap">
+        <div class="direction-toggle">
+          <button id="btn-de-en" class="toggle-btn active" data-dir="de-en">DE → EN</button>
+          <button id="btn-en-de" class="toggle-btn" data-dir="en-de">EN → DE</button>
+        </div>
+        <div class="search-input-wrap">
+          <input
+            id="search-input"
+            type="search"
+            inputmode="text"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="Type to search…"
+            aria-label="Search dictionary"
+          />
+          <button id="search-clear" class="search-clear" aria-label="Clear search" hidden>✕</button>
+        </div>
+      </div>
+
+      <div id="search-status" class="search-status"></div>
+      <ul id="results-list" class="results-list" role="list" aria-live="polite"></ul>
+    </section>
+
+    <!-- WORD DETAIL PAGE -->
+    <section id="page-detail" class="page">
+      <button class="back-btn" id="back-btn">← Back</button>
+      <div id="word-detail" class="word-detail"></div>
+    </section>
+
+    <!-- HISTORY PAGE -->
+    <section id="page-history" class="page">
+      <h2 class="page-title">Search History</h2>
+      <button id="clear-history-btn" class="text-btn">Clear all</button>
+      <ul id="history-list" class="results-list" role="list"></ul>
+      <p id="history-empty" class="empty-msg" hidden>No searches yet.</p>
+    </section>
+
+    <!-- BOOKMARKS PAGE -->
+    <section id="page-bookmarks" class="page">
+      <h2 class="page-title">Bookmarks</h2>
+      <ul id="bookmarks-list" class="results-list" role="list"></ul>
+      <p id="bookmarks-empty" class="empty-msg" hidden>No bookmarks yet.</p>
+    </section>
+
+    <!-- RESOURCES PAGE -->
+    <section id="page-resources" class="page">
+      <h2 class="page-title">Resources</h2>
+      <ul class="resource-list">
+        <li><a href="https://www.dw.com/en/learn-german/s-2469" target="_blank" rel="noopener">DW Learn German</a><span class="resource-desc">Free courses, A1–C1</span></li>
+        <li><a href="https://www.kaikki.org/dictionary/German/" target="_blank" rel="noopener">Kaikki.org</a><span class="resource-desc">Open source German dictionary data</span></li>
+        <li><a href="https://freedict.org/" target="_blank" rel="noopener">FreeDict</a><span class="resource-desc">Free bilingual dictionaries</span></li>
+        <li><a href="https://deutsch.lingolia.com/en/" target="_blank" rel="noopener">Lingolia German</a><span class="resource-desc">Grammar guides</span></li>
+        <li><a href="https://gutenberg.org/browse/languages/de" target="_blank" rel="noopener">Project Gutenberg — German</a><span class="resource-desc">Free German ebooks</span></li>
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
+    <a href="#search"    class="nav-item active" data-page="search">
+      <span class="nav-icon">🔍</span>
+      <span class="nav-label">Search</span>
+    </a>
+    <a href="#history"   class="nav-item" data-page="history">
+      <span class="nav-icon">🕐</span>
+      <span class="nav-label">History</span>
+    </a>
+    <a href="#bookmarks" class="nav-item" data-page="bookmarks">
+      <span class="nav-icon">🔖</span>
+      <span class="nav-label">Bookmarks</span>
+    </a>
+    <a href="#resources" class="nav-item" data-page="resources">
+      <span class="nav-icon">📚</span>
+      <span class="nav-label">Resources</span>
+    </a>
+  </nav>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Scripts (order matters) -->
+  <script src="js/db.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
