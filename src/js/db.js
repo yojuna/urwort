@@ -2,7 +2,7 @@
  *
  * Requires: vendor/dexie.min.js loaded before this file
  *
- * Schema v1 — three stores:
+ * Schema v2 — three stores:
  *
  *   history   — recent searches (Layer 4 user data)
  *   bookmarks — saved words     (Layer 4 user data)
@@ -20,15 +20,17 @@
 
 const db = new Dexie('urwort');
 
+// v1 definition kept so Dexie can migrate existing IndexedDB smoothly
 db.version(1).stores({
-  // history: auto-id PK, index on word and timestamp
   history:   '++id, word, dir, ts',
-
-  // bookmarks: composite key "word|dir"
   bookmarks: 'id, word, dir',
+  wordCache: 'id, word, dir, cachedAt',
+});
 
-  // wordCache: keyed by "word|dir" — stores full entry after first load
-  //            acts as Layer 2 offline cache
+// v2: add savedAt index to bookmarks (needed for orderBy('savedAt'))
+db.version(2).stores({
+  history:   '++id, word, dir, ts',
+  bookmarks: 'id, word, dir, savedAt',
   wordCache: 'id, word, dir, cachedAt',
 });
 
