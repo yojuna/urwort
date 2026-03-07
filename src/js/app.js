@@ -2,14 +2,14 @@
 
 (async () => {
 
-  // ---- State ----
+  // ── State ──────────────────────────────────────────────────────────────────
   const state = {
-    dir: localStorage.getItem('urwort:dir') || 'de-en',
+    dir:          localStorage.getItem('urwort:dir') || 'de-en',
     currentEntry: null,
-    bookmarkedSet: new Set(), // 'word|dir' keys for fast lookup in result list
+    bookmarkedSet: new Set(), // 'word|dir' keys for O(1) lookup in result cards
   };
 
-  // ---- Routing ----
+  // ── Routing ────────────────────────────────────────────────────────────────
   const PAGES = ['search', 'history', 'bookmarks', 'resources'];
 
   function showPage(name) {
@@ -17,135 +17,15 @@
     PAGES.forEach(p => {
       document.getElementById('page-' + p).classList.toggle('active', p === name);
     });
+    document.getElementById('page-detail').classList.remove('active');
     document.querySelectorAll('.nav-item').forEach(el => {
       el.classList.toggle('active', el.dataset.page === name);
     });
-
     if (name === 'history')   loadHistory();
     if (name === 'bookmarks') loadBookmarks();
   }
 
-  function onHashChange() {
-    const hash = location.hash.replace('#', '') || 'search';
-    showPage(hash);
-  }
-
-  window.addEventListener('hashchange', onHashChange);
-  onHashChange();
-
-  // ---- Direction toggle ----
-  function setDir(dir) {
-    state.dir = dir;
-    localStorage.setItem('urwort:dir', dir);
-    document.getElementById('btn-de-en').classList.toggle('active', dir === 'de-en');
-    document.getElementById('btn-en-de').classList.toggle('active', dir === 'en-de');
-    // re-run search if input has content
-    const q = document.getElementById('search-input').value;
-    if (q.length >= 2) runSearch(q);
-  }
-
-  document.getElementById('btn-de-en').addEventListener('click', () => setDir('de-en'));
-  document.getElementById('btn-en-de').addEventListener('click', () => setDir('en-de'));
-  setDir(state.dir); // apply stored preference on load
-
-  // ---- Load bookmarked set (for star icons in result list) ----
-  async function refreshBookmarkSet() {
-    const all = await DB.bookmarksGetAll();
-    state.bookmarkedSet = new Set(all.map(b => b.id));
-  }
-  await refreshBookmarkSet();
-
-  // ---- Search input ----
-  const searchInput = document.getElementById('search-input');
-  const clearBtn    = document.getElementById('search-clear');
-
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value;
-    clearBtn.hidden = q.length === 0;
-
-    // Auto-detect language direction from umlaut chars
-    const detected = Search.detectDir(q);
-    if (detected && detected !== state.dir) setDir(detected);
-
-    runSearch(q);
-  });
-
-  clearBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    clearBtn.hidden = true;
-    UI.renderResults(null, state.dir, state.bookmarkedSet);
-    UI.setSearchStatus('');
-    searchInput.focus();
-  });
-
-  function runSearch(q) {
-    Search.query(q, state.dir, (status, results) => {
-      if (status === 'loading') {
-        UI.setSearchStatus('Searching…', true);
-        return;
-      }
-      UI.renderResults(results, state.dir, state.bookmarkedSet);
-    });
-  }
-
-  // ---- Result card click → detail / bookmark ----
-  document.getElementById('results-list').addEventListener('click', async (e) => {
-    // Bookmark button
-    const bmBtn = e.target.closest('.result-bookmark-btn');
-    if (bmBtn) {
-      e.stopPropagation();
-      await toggleBookmark(bmBtn.dataset.word, bmBtn.dataset.dir);
-      return;
-    }
-
-    // Card click → detail
-    const card = e.target.closest('.result-card');
-    if (card) {
-      openDetail(card.dataset.word, card.dataset.dir);
-    }
-  });
-
-  // ---- History / bookmarks list card click → detail ----
-  ['history-list', 'bookmarks-list'].forEach(id => {
-    document.getElementById(id).addEventListener('click', (e) => {
-      const card = e.target.closest('.result-card');
-      if (card) openDetail(card.dataset.word, card.dataset.dir);
-    });
-  });
-
-  // ---- Open detail ----
-  async function openDetail(word, dir) {
-    // Save to history
-    await DB.historyAdd(word, dir);
-
-    let entry = await Search.lookup(word, dir);
-    if (!entry) {
-      // Fallback: build minimal entry from what we know
-      entry = { w: word, pos: '', gender: null, en: [], ex: [] };
-    }
-    state.currentEntry = { entry, dir };
-    await UI.renderDetail(entry, dir);
-
-    // Wire the bookmark button on the detail page
-    const btn = document.getElementById('detail-bookmark-btn');
-    if (btn) {
-      btn.addEventListener('click', async () => {
-        await toggleBookmark(word, dir);
-        // re-render detail to update button state
-        await UI.renderDetail(entry, dir);
-        const newBtn = document.getElementById('detail-bookmark-btn');
-        newBtn.addEventListener('click', () => toggleBookmark(word, dir));
-      });
-    }
-
-    location.hash = 'detail';
-  }
-
-  // ---- Hash for detail page (not in nav) ----
-  const origShowPage = showPage;
-  // Override to handle 'detail' hash
-  window.removeEventListener('hashchange', onHashChange);
-  window.addEventListener('hashchange', () => {
+  function handleHash() {
     const hash = location.hash.replace('#', '') || 'search';
     if (hash === 'detail') {
       PAGES.forEach(p => document.getElementById('page-' + p).classList.remove('active'));
@@ -155,62 +35,191 @@
       document.getElementById('page-detail').classList.remove('active');
       showPage(hash);
     }
+  }
+
+  window.addEventListener('hashchange', handleHash);
+  handleHash();
+
+  // ── Direction toggle ───────────────────────────────────────────────────────
+  function setDir(dir) {
+    state.dir = dir;
+    localStorage.setItem('urwort:dir', dir);
+    document.getElementById('btn-de-en').classList.toggle('active', dir === 'de-en');
+    document.getElementById('btn-en-de').classList.toggle('active', dir === 'en-de');
+    const q = document.getElementById('search-input').value;
+    if (q.length >= 2) runSearch(q);
+  }
+
+  document.getElementById('btn-de-en').addEventListener('click', () => setDir('de-en'));
+  document.getElementById('btn-en-de').addEventListener('click', () => setDir('en-de'));
+  setDir(state.dir);
+
+  // ── Bookmark set (for result-card star icons) ──────────────────────────────
+  async function refreshBookmarkSet() {
+    const all = await DB.bookmarksGetAll();
+    state.bookmarkedSet = new Set(all.map(b => b.id));
+  }
+  await refreshBookmarkSet();
+
+  // ── Search input ───────────────────────────────────────────────────────────
+  const searchInput = document.getElementById('search-input');
+  const clearBtn    = document.getElementById('search-clear');
+
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value;
+    clearBtn.hidden = q.length === 0;
+    if (q.length === 0) UI.hideSuggestions();
+    // Auto-detect DE input via umlaut chars
+    const detected = Search.detectDir(q);
+    if (detected && detected !== state.dir) setDir(detected);
+    runSearch(q);
   });
-  // Trigger initial routing
-  (() => {
-    const hash = location.hash.replace('#', '') || 'search';
-    if (hash === 'detail') {
-      document.getElementById('page-detail').classList.add('active');
-    } else {
-      showPage(hash);
+
+  clearBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    clearBtn.hidden   = true;
+    UI.hideSuggestions();
+    UI.renderResults(null, state.dir, state.bookmarkedSet);
+    UI.setSearchStatus('');
+    searchInput.focus();
+  });
+
+  // Dismiss dropdown when tapping outside
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.search-input-wrap')) UI.hideSuggestions();
+  });
+
+  function runSearch(q) {
+    Search.query(q, state.dir, (status, results) => {
+      if (status === 'loading') {
+        UI.setSearchStatus('Searching…', true);
+        return;
+      }
+      UI.renderResults(results, state.dir, state.bookmarkedSet);
+      // Show dropdown only when input is focused and has text
+      if (document.activeElement === searchInput && q.trim().length >= 2) {
+        UI.renderSuggestions(results, q.trim(), state.dir);
+      } else {
+        UI.hideSuggestions();
+      }
+    });
+  }
+
+  // ── Suggestion clicks ──────────────────────────────────────────────────────
+  document.getElementById('suggestions').addEventListener('pointerdown', (e) => {
+    // pointerdown so we fire before the input blur hides the dropdown
+    const item = e.target.closest('.suggestion-item');
+    if (!item) return;
+    e.preventDefault(); // keep input focus
+    const { word, dir } = item.dataset;
+    UI.hideSuggestions();
+    searchInput.value = word;
+    clearBtn.hidden = false;
+    openDetail(word, dir);
+  });
+
+  // ── Result card clicks ─────────────────────────────────────────────────────
+  document.getElementById('results-list').addEventListener('click', async (e) => {
+    const bmBtn = e.target.closest('.result-bookmark-btn');
+    if (bmBtn) {
+      e.stopPropagation();
+      await toggleBookmark(bmBtn.dataset.word, bmBtn.dataset.dir);
+      return;
     }
-  })();
-
-  // ---- Back button ----
-  document.getElementById('back-btn').addEventListener('click', () => {
-    history.back();
+    const card = e.target.closest('.result-card');
+    if (card) openDetail(card.dataset.word, card.dataset.dir);
   });
 
-  // ---- Toggle bookmark ----
-  async function toggleBookmark(word, dir) {
+  ['history-list', 'bookmarks-list'].forEach(listId => {
+    document.getElementById(listId).addEventListener('click', (e) => {
+      const card = e.target.closest('.result-card');
+      if (card) openDetail(card.dataset.word, card.dataset.dir);
+    });
+  });
+
+  // ── Open word detail ───────────────────────────────────────────────────────
+  async function openDetail(word, dir) {
+    UI.hideSuggestions();
+    await DB.historyAdd(word, dir);
+
+    // Layer 2 cache check first (offline-forever after first view)
+    let entry = await DB.wordCacheGet(word, dir);
+
+    if (!entry) {
+      // Not cached yet — fetch from chunk via worker
+      entry = await Search.lookup(word, dir);
+      if (entry) {
+        // Persist to Layer 2 cache so it's available offline forever
+        await DB.wordCachePut(entry, dir);
+      } else {
+        entry = { w: word, pos: '', gender: null, l1: { en: [], ex: [] } };
+      }
+    }
+
+    state.currentEntry = { entry, dir };
+    await UI.renderDetail(entry, dir);
+    wireDetailBookmarkBtn(word, dir, entry);
+    location.hash = 'detail';
+  }
+
+  function wireDetailBookmarkBtn(word, dir, entry) {
+    const btn = document.getElementById('detail-bookmark-btn');
+    if (!btn) return;
+    // Replace node to remove stale listeners
+    const fresh = btn.cloneNode(true);
+    btn.parentNode.replaceChild(fresh, btn);
+    fresh.addEventListener('click', async () => {
+      await toggleBookmark(word, dir, entry);
+      await UI.renderDetail(entry, dir);
+      wireDetailBookmarkBtn(word, dir, entry);
+    });
+  }
+
+  // ── Back button ────────────────────────────────────────────────────────────
+  document.getElementById('back-btn').addEventListener('click', () => history.back());
+
+  // ── Toggle bookmark ────────────────────────────────────────────────────────
+  async function toggleBookmark(word, dir, entry) {
     const exists = await DB.bookmarkExists(word, dir);
     if (exists) {
       await DB.bookmarkRemove(word, dir);
       UI.toast('Bookmark removed');
     } else {
-      const entry = await Search.lookup(word, dir) || { w: word, pos: '', gender: null, en: [], ex: [] };
-      await DB.bookmarkAdd(entry, dir);
+      // Use passed entry, or look it up, or fallback
+      const e = entry
+        || await DB.wordCacheGet(word, dir)
+        || await Search.lookup(word, dir)
+        || { w: word, pos: '', gender: null, l1: { en: [], ex: [] } };
+      await DB.bookmarkAdd(e, dir);
       UI.toast('Bookmarked!');
     }
     await refreshBookmarkSet();
-    // Refresh current results list bookmark icons if on search page
     const q = searchInput.value;
     if (q.length >= 2) runSearch(q);
   }
 
-  // ---- Clear history ----
+  // ── History page ───────────────────────────────────────────────────────────
   document.getElementById('clear-history-btn').addEventListener('click', async () => {
     await DB.historyClear();
     loadHistory();
     UI.toast('History cleared');
   });
 
-  // ---- Load history ----
   async function loadHistory() {
     const items = await DB.historyGetAll();
     UI.renderHistory(items);
   }
 
-  // ---- Load bookmarks ----
+  // ── Bookmarks page ─────────────────────────────────────────────────────────
   async function loadBookmarks() {
     const items = await DB.bookmarksGetAll();
     UI.renderBookmarks(items);
   }
 
-  // ---- Register Service Worker ----
+  // ── Service Worker registration ────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(err => {
-      console.warn('SW registration failed:', err);
+      console.warn('[app] SW registration failed:', err);
     });
   }
 

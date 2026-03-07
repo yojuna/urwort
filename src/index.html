@@ -41,8 +41,11 @@
             spellcheck="false"
             placeholder="Type to search…"
             aria-label="Search dictionary"
+            aria-autocomplete="list"
+            aria-controls="suggestions"
           />
           <button id="search-clear" class="search-clear" aria-label="Clear search" hidden>✕</button>
+          <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
         </div>
       </div>
 
@@ -108,7 +111,8 @@
   <!-- Toast notification -->
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <!-- Scripts (order matters) -->
+  <!-- Scripts (order matters: Dexie must load before db.js) -->
+  <script src="js/vendor/dexie.min.js"></script>
   <script src="js/db.js"></script>
   <script src="js/search.js"></script>
   <script src="js/ui.js"></script>

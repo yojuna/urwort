@@ -1,144 +1,130 @@
-/* db.js — thin IndexedDB wrapper
-   Stores: search history + bookmarks
-   DB name: urwort  version: 1
-   Stores:
-     history   { id (autoIncrement), word, dir, ts }
-     bookmarks { id (word+dir key), word, dir, entry }
-*/
+/* db.js — Dexie-backed database (layered schema)
+ *
+ * Requires: vendor/dexie.min.js loaded before this file
+ *
+ * Schema v1 — three stores:
+ *
+ *   history   — recent searches (Layer 4 user data)
+ *   bookmarks — saved words     (Layer 4 user data)
+ *   wordCache — Layer 2/3 entry payloads cached after first API/file hit
+ *               so they are available offline forever once viewed
+ *
+ * Entry shape (mirrors build-dict output):
+ *   {
+ *     id, w, pos, gender,
+ *     meta: { freq, level },
+ *     l1:  { en[], ex[] },
+ *     sources: { freedict: { senses } }
+ *   }
+ */
 
-const DB_NAME    = 'urwort';
-const DB_VERSION = 1;
+const db = new Dexie('urwort');
 
-let _db = null;
+db.version(1).stores({
+  // history: auto-id PK, index on word and timestamp
+  history:   '++id, word, dir, ts',
 
-function openDB() {
-  if (_db) return Promise.resolve(_db);
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+  // bookmarks: composite key "word|dir"
+  bookmarks: 'id, word, dir',
 
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
+  // wordCache: keyed by "word|dir" — stores full entry after first load
+  //            acts as Layer 2 offline cache
+  wordCache: 'id, word, dir, cachedAt',
+});
 
-      if (!db.objectStoreNames.contains('history')) {
-        const hs = db.createObjectStore('history', { keyPath: 'id', autoIncrement: true });
-        hs.createIndex('word', 'word', { unique: false });
-        hs.createIndex('ts',   'ts',   { unique: false });
-      }
-
-      if (!db.objectStoreNames.contains('bookmarks')) {
-        db.createObjectStore('bookmarks', { keyPath: 'id' });
-      }
-    };
-
-    req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
-    req.onerror   = (e) => reject(e.target.error);
-  });
-}
-
-// ---- generic helpers ----
-
-function txStore(storeName, mode) {
-  return openDB().then(db => {
-    const tx    = db.transaction(storeName, mode);
-    const store = tx.objectStore(storeName);
-    return { tx, store };
-  });
-}
-
-function promisifyReq(req) {
-  return new Promise((res, rej) => {
-    req.onsuccess = () => res(req.result);
-    req.onerror   = () => rej(req.error);
-  });
-}
-
-// ---- history ----
+// ── History ──────────────────────────────────────────────────────────────────
 
 /**
- * Add a search to history (deduplicates by word+dir, keeps newest).
- * @param {string} word
- * @param {string} dir  'de-en' | 'en-de'
+ * Record a search. Deduplicates by word+dir (keeps newest timestamp).
  */
 async function historyAdd(word, dir) {
-  const { store } = await txStore('history', 'readwrite');
-  // remove any existing entry with same word+dir to avoid duplicates
-  const idx     = store.index('word');
-  const cursor  = await promisifyReq(idx.openCursor(IDBKeyRange.only(word)));
-  if (cursor) {
-    // walk cursor to find matching dir
-    let c = cursor;
-    while (c) {
-      if (c.value.dir === dir) c.delete();
-      c = await promisifyReq(c.continue()).catch(() => null);
-    }
-  }
-  return promisifyReq(store.add({ word, dir, ts: Date.now() }));
+  // Delete any existing entry for this word+dir pair
+  await db.history.where({ word, dir }).delete();
+  return db.history.add({ word, dir, ts: Date.now() });
 }
 
 /**
- * Get history, newest first, up to `limit` items.
+ * Return history newest-first, up to `limit` entries.
  */
 async function historyGetAll(limit = 100) {
-  const { store } = await txStore('history', 'readonly');
-  const idx = store.index('ts');
-  return new Promise((resolve, reject) => {
-    const results = [];
-    const req = idx.openCursor(null, 'prev');
-    req.onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor && results.length < limit) {
-        results.push(cursor.value);
-        cursor.continue();
-      } else {
-        resolve(results);
-      }
-    };
-    req.onerror = () => reject(req.error);
-  });
+  return db.history
+    .orderBy('ts')
+    .reverse()
+    .limit(limit)
+    .toArray();
 }
 
-/**
- * Clear all history.
- */
 async function historyClear() {
-  const { store } = await txStore('history', 'readwrite');
-  return promisifyReq(store.clear());
+  return db.history.clear();
 }
 
-// ---- bookmarks ----
+// ── Bookmarks ─────────────────────────────────────────────────────────────────
 
 /**
- * @param {object} entry  full word entry object
- * @param {string} dir
+ * Bookmark a word. Stores the full entry for offline display.
+ * @param {object} entry  — full word entry object from dictionary
+ * @param {string} dir    — 'de-en' | 'en-de'
  */
 async function bookmarkAdd(entry, dir) {
-  const { store } = await txStore('bookmarks', 'readwrite');
-  return promisifyReq(store.put({ id: entry.w + '|' + dir, word: entry.w, dir, entry }));
+  return db.bookmarks.put({
+    id:    entry.w + '|' + dir,
+    word:  entry.w,
+    dir,
+    entry,
+    savedAt: Date.now(),
+  });
 }
 
 async function bookmarkRemove(word, dir) {
-  const { store } = await txStore('bookmarks', 'readwrite');
-  return promisifyReq(store.delete(word + '|' + dir));
+  return db.bookmarks.delete(word + '|' + dir);
 }
 
 async function bookmarkExists(word, dir) {
-  const { store } = await txStore('bookmarks', 'readonly');
-  const result = await promisifyReq(store.get(word + '|' + dir));
-  return result !== undefined;
+  const count = await db.bookmarks.where({ id: word + '|' + dir }).count();
+  return count > 0;
 }
 
 async function bookmarksGetAll() {
-  const { store } = await txStore('bookmarks', 'readonly');
-  return promisifyReq(store.getAll());
+  return db.bookmarks.orderBy('savedAt').reverse().toArray();
 }
 
-// expose as global (no module bundler)
+// ── Word cache (Layer 2 — offline-forever after first view) ──────────────────
+
+/**
+ * Cache a full entry after it's been loaded.
+ * Called by app.js when a word detail is opened.
+ */
+async function wordCachePut(entry, dir) {
+  return db.wordCache.put({
+    id:       entry.w + '|' + dir,
+    word:     entry.w,
+    dir,
+    entry,
+    cachedAt: Date.now(),
+  });
+}
+
+/**
+ * Retrieve a cached entry. Returns null if not in cache.
+ */
+async function wordCacheGet(word, dir) {
+  const row = await db.wordCache.get(word + '|' + dir);
+  return row ? row.entry : null;
+}
+
+// ── Expose as global ──────────────────────────────────────────────────────────
+
 window.DB = {
+  // history
   historyAdd,
   historyGetAll,
   historyClear,
+  // bookmarks
   bookmarkAdd,
   bookmarkRemove,
   bookmarkExists,
   bookmarksGetAll,
+  // word cache
+  wordCachePut,
+  wordCacheGet,
 };

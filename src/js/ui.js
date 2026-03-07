@@ -22,6 +22,46 @@ const UI = (() => {
     return `<span class="result-gender">${GENDER_LABEL[gender] || gender}</span>`;
   }
 
+  // ---- Suggestions dropdown ----
+  const MAX_SUGGESTIONS = 5;
+
+  // Highlight the query string inside the word (case-insensitive)
+  function highlightMatch(word, q) {
+    const idx = word.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) return word;
+    return word.slice(0, idx)
+      + `<mark>${word.slice(idx, idx + q.length)}</mark>`
+      + word.slice(idx + q.length);
+  }
+
+  function renderSuggestions(entries, q, dir) {
+    const el = document.getElementById('suggestions');
+    if (!entries || entries.length === 0) {
+      el.hidden = true;
+      el.innerHTML = '';
+      return;
+    }
+    const top = entries.slice(0, MAX_SUGGESTIONS);
+    el.innerHTML = top.map(entry => {
+      const trans = (entry.l1?.en || []).slice(0, 2).join(', ');
+      const gender = entry.gender ? ` <span style="color:var(--accent);font-size:0.75rem">${{ m:'der', f:'die', n:'das' }[entry.gender]}</span>` : '';
+      return `<li class="suggestion-item" role="option"
+                  data-word="${entry.w}" data-dir="${dir}">
+        <span class="suggestion-word">${highlightMatch(entry.w, q)}${gender}</span>
+        <span class="suggestion-meta">${trans}</span>
+      </li>`;
+    }).join('');
+    el.hidden = false;
+  }
+
+  function hideSuggestions() {
+    const el = document.getElementById('suggestions');
+    el.hidden = true;
+    el.innerHTML = '';
+  }
+
+  const MAX_RESULTS = 5;
+
   // ---- Render a list of result cards ----
   function renderResults(entries, dir, bookmarkedSet) {
     const list = document.getElementById('results-list');
@@ -39,10 +79,15 @@ const UI = (() => {
       return;
     }
 
-    status.textContent = `${entries.length} result${entries.length !== 1 ? 's' : ''}`;
+    const total = entries.length;
+    const shown = entries.slice(0, MAX_RESULTS);
+    status.textContent = total > MAX_RESULTS
+      ? `${total} results — showing top ${MAX_RESULTS}`
+      : `${total} result${total !== 1 ? 's' : ''}`;
 
-    list.innerHTML = entries.map(entry => {
+    list.innerHTML = shown.map(entry => {
       const isBookmarked = bookmarkedSet.has(entry.w + '|' + dir);
+      const trans = (entry.l1?.en || []).slice(0, 3).join(', ');
       return `
         <li class="result-card" data-word="${entry.w}" data-dir="${dir}">
           <div class="result-left">
@@ -51,7 +96,7 @@ const UI = (() => {
               ${genderBadge(entry.gender)}
               <span class="result-pos">${entry.pos || ''}</span>
             </div>
-            <div class="result-translations">${(entry.en || []).join(', ')}</div>
+            <div class="result-translations">${trans}</div>
           </div>
           <button class="result-bookmark-btn ${isBookmarked ? 'bookmarked' : ''}"
                   data-word="${entry.w}" data-dir="${dir}"
@@ -86,13 +131,13 @@ const UI = (() => {
 
       <div class="detail-section-title">${translationLabel}</div>
       <div class="detail-translations">
-        ${(entry.en || []).map(t => `<span class="translation-chip">${t}</span>`).join('')}
+        ${(entry.l1?.en || []).map(t => `<span class="translation-chip">${t}</span>`).join('')}
       </div>
 
-      ${entry.ex && entry.ex.length ? `
+      ${entry.l1?.ex && entry.l1.ex.length ? `
         <div class="detail-section-title">Examples</div>
         <div class="detail-examples">
-          ${entry.ex.map(e => `<div class="example-item">${e}</div>`).join('')}
+          ${entry.l1.ex.map(e => `<div class="example-item">${e}</div>`).join('')}
         </div>` : ''}
 
       <button class="bookmark-detail-btn ${isBookmarked ? 'bookmarked' : ''}"
@@ -141,7 +186,7 @@ const UI = (() => {
             ${genderBadge(item.entry?.gender)}
             <span class="result-pos">${item.entry?.pos || ''}</span>
           </div>
-          <div class="result-translations">${(item.entry?.en || []).join(', ')}</div>
+          <div class="result-translations">${(item.entry?.l1?.en || []).join(', ')}</div>
         </div>
       </li>`).join('');
   }
@@ -149,6 +194,8 @@ const UI = (() => {
   return {
     toast,
     renderResults,
+    renderSuggestions,
+    hideSuggestions,
     setSearchStatus,
     renderDetail,
     renderHistory,

@@ -1,82 +1,104 @@
-/* search.js — dictionary search logic
-   - Per-letter chunk loading (lazy, cached in memory for the session)
-   - Bidirectional: de-en and en-de
-   - Ranking: exact > prefix > substring
-   - Debounce built-in via Search.query()
-*/
+/* search.js — main-thread bridge to search.worker.js
+ *
+ * Spawns the Web Worker once and routes messages to/from it.
+ * The main thread never does any JSON parsing or array filtering.
+ *
+ * Public API (same shape as before so app.js needs minimal changes):
+ *   Search.query(rawInput, dir, callback)
+ *     callback(status, results)  status: 'loading' | 'done' | null
+ *
+ *   Search.lookup(word, dir) → Promise<entry | null>
+ *
+ *   Search.detectDir(input)  → 'de-en' | null
+ */
 
 const Search = (() => {
-  // In-memory cache: 'de-en:h' → Array of entries
-  const chunkCache = {};
-  let debounceTimer = null;
-  const DEBOUNCE_MS = 200;
-
-  // ---- Language detection heuristic ----
-  // If the input contains German-specific characters → assume de-en
+  // ── German character detection ────────────────────────────────────────────
   const DE_CHARS = /[äöüÄÖÜß]/;
 
   function detectDir(input) {
-    return DE_CHARS.test(input) ? 'de-en' : null; // null = use current toggle
+    return DE_CHARS.test(input) ? 'de-en' : null;
   }
 
-  // ---- Chunk loader ----
-  async function loadChunk(dir, letter) {
-    const key = `${dir}:${letter}`;
-    if (chunkCache[key]) return chunkCache[key];
+  // ── Worker setup ──────────────────────────────────────────────────────────
+  let worker = null;
+  let msgId  = 0;
 
-    const url = `data/${dir}/${letter}.json`;
-    try {
-      const res = await fetch(url);
-      if (!res.ok) { chunkCache[key] = []; return []; }
-      const data = await res.json();
-      chunkCache[key] = data;
-      return data;
-    } catch {
-      chunkCache[key] = [];
-      return [];
+  // Pending lookup promises: id → { resolve, reject }
+  const pending = new Map();
+
+  // Active search callback (only one at a time — newest wins)
+  let searchCallback = null;
+  let searchId       = null;
+
+  function getWorker() {
+    if (worker) return worker;
+
+    worker = new Worker('js/search.worker.js');
+
+    worker.onmessage = (e) => {
+      const msg = e.data;
+
+      switch (msg.type) {
+        case 'SEARCH_RESULT':
+          // Only deliver results for the most recent search request
+          if (msg.id === searchId && searchCallback) {
+            searchCallback(msg.status, msg.results);
+            if (msg.status === 'done') {
+              searchCallback = null;
+              searchId       = null;
+            }
+          }
+          break;
+
+        case 'LOOKUP_RESULT': {
+          const p = pending.get(msg.id);
+          if (p) { p.resolve(msg.entry); pending.delete(msg.id); }
+          break;
+        }
+
+        case 'ERROR': {
+          const p = pending.get(msg.id);
+          if (p) { p.reject(new Error(msg.message)); pending.delete(msg.id); }
+          console.error('[search] Worker error:', msg.message);
+          break;
+        }
+      }
+    };
+
+    worker.onerror = (err) => {
+      console.error('[search] Worker fatal error:', err);
+      // Reject all pending lookups
+      for (const [, p] of pending) p.reject(err);
+      pending.clear();
+      worker = null; // allow respawn on next call
+    };
+
+    return worker;
+  }
+
+  // ── Public: query (debounced inside worker) ───────────────────────────────
+  function query(rawInput, dir, callback) {
+    const q = rawInput.trim();
+    if (q.length < 2) {
+      callback(null, []);
+      return;
     }
+
+    const id       = ++msgId;
+    searchId       = id;
+    searchCallback = callback;
+
+    getWorker().postMessage({ type: 'SEARCH', id, query: q, dir });
   }
 
-  // ---- Scoring ----
-  function score(entry, q) {
-    const w = entry.w.toLowerCase();
-    if (w === q)           return 3; // exact
-    if (w.startsWith(q))   return 2; // prefix
-    if (w.includes(q))     return 1; // substring
-    return 0;
-  }
-
-  // ---- Search in a loaded chunk ----
-  function filterChunk(entries, q) {
-    const results = [];
-    for (const entry of entries) {
-      const s = score(entry, q);
-      if (s > 0) results.push({ entry, score: s });
-    }
-    results.sort((a, b) => b.score - a.score || a.entry.w.localeCompare(b.entry.w));
-    return results.map(r => r.entry);
-  }
-
-  // ---- Public: run a search (debounced) ----
-  function query(rawInput, dir, onResults) {
-    clearTimeout(debounceTimer);
-    const q = rawInput.trim().toLowerCase();
-    if (q.length < 2) { onResults(null, []); return; }
-
-    debounceTimer = setTimeout(async () => {
-      const letter = q[0];
-      onResults('loading', []);
-      const entries = await loadChunk(dir, letter);
-      const results = filterChunk(entries, q);
-      onResults('done', results);
-    }, DEBOUNCE_MS);
-  }
-
-  // ---- Public: immediate (no debounce), used for history/bookmark re-lookup ----
-  async function lookup(word, dir) {
-    const letter = word[0].toLowerCase();
-    const entries = await loadChunk(dir, letter);
-    return entries.find(e => e.w.toLowerCase() === word.toLowerCase()) || null;
+  // ── Public: immediate lookup (no debounce) ────────────────────────────────
+  function lookup(word, dir) {
+    return new Promise((resolve, reject) => {
+      const id = ++msgId;
+      pending.set(id, { resolve, reject });
+      getWorker().postMessage({ type: 'LOOKUP', id, word, dir });
+    });
   }
 
   return { query, lookup, detectDir };
