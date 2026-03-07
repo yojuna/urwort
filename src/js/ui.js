@@ -50,7 +50,10 @@ const UI = (() => {
 
     list.innerHTML = shown.map(entry => {
       const isBookmarked = bookmarkedSet.has(entry.w + '|' + dir);
-      const trans = (entry.l1?.en || []).slice(0, 3).join(', ');
+      // Index rows (from wordIndex IDB) have `hint`; full entries have `l1.en`
+      const trans = entry.hint
+        ? entry.hint
+        : (entry.l1?.en || []).slice(0, 3).join(', ');
       return `
         <li class="result-card" data-word="${entry.w}" data-dir="${dir}">
           <div class="result-left">

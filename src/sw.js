@@ -1,26 +1,24 @@
-/* sw.js — Service Worker v2
+/* sw.js — Service Worker v5 (v2 architecture)
  *
  * Cache strategies:
- *   App shell (HTML, CSS, JS, Dexie, Worker, manifest, icons)
+ *   App shell (HTML, CSS, JS, workers, manifest, icons)
  *     → Cache-first, pre-cached on SW install
- *   Dictionary data chunks (/data/xx-xx/*.json)
- *     → Cache-first, populated on demand (lazy per letter)
- *     → Falls back to [] so the app doesn't crash offline
- *   Everything else
- *     → Network-first with cache fallback
  *
- * Web Worker compatibility:
- *   search.worker.js is listed in SHELL_ASSETS so it is pre-cached on
- *   install. When the main thread spawns `new Worker('js/search.worker.js')`
- *   the SW intercepts that fetch and serves it from cache — fully offline.
- *   The worker's own fetch() calls for data chunks are also intercepted.
+ *   /data/{dir}/index/{letter}.json  (slim index chunks — seeding)
+ *     → Network-first during seeding (always fresh), cached after
  *
- * Version bump: increment SHELL_CACHE name to force clients to update.
+ *   /data/{dir}/data/{letter}.json   (full data chunks — lazy detail)
+ *     → Cache-first, populated on first word detail open
+ *
+ *   External requests (DWDS API etc.)
+ *     → Pass-through, not cached
+ *
+ * Version: bump SHELL_CACHE to force all clients to update.
  */
 
-const SHELL_CACHE = 'urwort-shell-v4';
-const DATA_CACHE  = 'urwort-data-v2';
-const KNOWN_CACHES = ['urwort-shell-v4', 'urwort-data-v2'];
+const SHELL_CACHE  = 'urwort-shell-v5';
+const DATA_CACHE   = 'urwort-data-v3';
+const KNOWN_CACHES = [SHELL_CACHE, DATA_CACHE];
 
 const SHELL_ASSETS = [
   '/',
@@ -30,7 +28,7 @@ const SHELL_ASSETS = [
   '/js/vendor/dexie.min.js',
   '/js/db.js',
   '/js/search.js',
-  '/js/search.worker.js',
+  '/js/seed.worker.js',
   '/js/ui.js',
   '/js/app.js',
   '/icons/icon-192.png',
@@ -69,19 +67,26 @@ self.addEventListener('fetch', (event) => {
 
   const path = url.pathname;
 
-  // Dictionary data chunks → cache-first, populate on demand
-  if (path.startsWith('/data/')) {
+  // Slim index chunks: network-first so seeding always gets fresh data,
+  // then cache the response for offline re-seed attempts.
+  if (path.match(/^\/data\/[a-z-]+\/index\//)) {
+    event.respondWith(networkFirstData(event.request));
+    return;
+  }
+
+  // Full data chunks: cache-first for fast offline detail views.
+  if (path.match(/^\/data\/[a-z-]+\/data\//)) {
     event.respondWith(cacheFirstData(event.request));
     return;
   }
 
-  // Shell assets (includes worker file) → cache-first
+  // Shell assets (HTML, CSS, JS, workers) → cache-first
   if (isShellAsset(path)) {
     event.respondWith(cacheFirst(SHELL_CACHE, event.request));
     return;
   }
 
-  // Fallback → network-first with shell cache backup
+  // Everything else → network with shell cache backup
   event.respondWith(networkFirst(event.request));
 });
 
@@ -109,6 +114,26 @@ async function cacheFirst(cacheName, request) {
   }
 }
 
+async function networkFirstData(request) {
+  // Try network first; fall back to cache; final fallback: empty array
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(DATA_CACHE);
+      cache.put(request, response.clone());
+      return response;
+    }
+  } catch { /* offline */ }
+
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  return new Response('[]', {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 async function cacheFirstData(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
@@ -120,9 +145,9 @@ async function cacheFirstData(request) {
     }
     return response;
   } catch {
-    // Return empty array so the worker gracefully handles missing chunks offline
+    // Return empty array so the app degrades gracefully offline
     return new Response('[]', {
-      status:  200,
+      status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   }

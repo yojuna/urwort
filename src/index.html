@@ -137,6 +137,19 @@
   <!-- Toast notification -->
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <!-- Seeding overlay (shown on first launch while wordIndex is being built) -->
+  <div id="seed-overlay" class="seed-overlay" hidden>
+    <div class="seed-box">
+      <div class="seed-title">urwort</div>
+      <div class="seed-subtitle">Building your dictionary…</div>
+      <div class="seed-bar-wrap">
+        <div id="seed-bar" class="seed-bar"></div>
+      </div>
+      <div id="seed-status" class="seed-status">Starting…</div>
+      <div class="seed-note">This takes ~15 seconds and happens once.<br>The app works fully offline after this.</div>
+    </div>
+  </div>
+
   <!-- Scripts (order matters: Dexie must load before db.js) -->
   <script src="js/vendor/dexie.min.js"></script>
   <script src="js/db.js"></script>

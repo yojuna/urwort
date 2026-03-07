@@ -1,6 +1,31 @@
-/* app.js — main application: init, routing, event wiring */
+/* app.js — main application: init, routing, event wiring (v2) */
 
 (async () => {
+
+  // ── Seeding: run before anything else ─────────────────────────────────────
+  if (!Search.isSeeded()) {
+    const overlay   = document.getElementById('seed-overlay');
+    const bar       = document.getElementById('seed-bar');
+    const statusEl  = document.getElementById('seed-status');
+
+    overlay.hidden = false;
+
+    try {
+      await Search.seed(({ done, total, letter, dir }) => {
+        const pct = Math.round((done / total) * 100);
+        bar.style.width = pct + '%';
+        statusEl.textContent = `${dir}  /  ${letter}.json  (${done}/${total})`;
+      });
+    } catch (err) {
+      // Seeding failed (e.g. offline on first launch)
+      statusEl.textContent = 'Failed to build dictionary. Please connect to the internet and reload.';
+      console.error('[app] seeding error:', err);
+      // Leave overlay visible — app is unusable without index
+      return;
+    }
+
+    overlay.hidden = true;
+  }
 
   // ── State ──────────────────────────────────────────────────────────────────
   const state = {
@@ -113,21 +138,25 @@
 
   // ── Open word detail ───────────────────────────────────────────────────────
   async function openDetail(word, dir) {
-    // Layer 2 cache check first (offline-forever after first view)
-    let entry = await DB.wordCacheGet(word, dir);
+    // 1. Check wordData IDB cache (instant if previously opened)
+    let entry = await DB.wordDataGet(word, dir);
 
     if (!entry) {
-      // Not cached yet — fetch from chunk via worker
+      // 2. Not in IDB — fetch from data chunk and cache it (Layer 2)
       entry = await Search.lookup(word, dir);
-      if (entry) {
-        // Persist to Layer 2 cache so it's available offline forever
-        await DB.wordCachePut(entry, dir);
-      } else {
-        entry = { w: word, pos: '', gender: null, l1: { en: [], ex: [] } };
+      if (!entry) {
+        // Fallback: at minimum show the index row data
+        const indexRow = await DB.wordIndexGet(word, dir);
+        entry = {
+          w:      word,
+          pos:    indexRow?.pos    || '',
+          gender: indexRow?.gender || null,
+          l1:     { en: indexRow?.hint ? [indexRow.hint] : [], ex: [] },
+        };
       }
     }
 
-    // Record history with translations available for quick display
+    // Record in history with top-2 translations for quick display
     const translations = (entry.l1?.en || []).slice(0, 2);
     await DB.historyAdd(word, dir, translations);
 
@@ -140,7 +169,6 @@
   function wireDetailBookmarkBtn(word, dir, entry) {
     const btn = document.getElementById('detail-bookmark-btn');
     if (!btn) return;
-    // Replace node to remove stale listeners
     const fresh = btn.cloneNode(true);
     btn.parentNode.replaceChild(fresh, btn);
     fresh.addEventListener('click', async () => {
@@ -160,9 +188,8 @@
       await DB.bookmarkRemove(word, dir);
       UI.toast('Bookmark removed');
     } else {
-      // Use passed entry, or look it up, or fallback
       const e = entry
-        || await DB.wordCacheGet(word, dir)
+        || await DB.wordDataGet(word, dir)
         || await Search.lookup(word, dir)
         || { w: word, pos: '', gender: null, l1: { en: [], ex: [] } };
       await DB.bookmarkAdd(e, dir);
@@ -193,7 +220,7 @@
 
   // ── Service Worker registration ────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(err => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
       console.warn('[app] SW registration failed:', err);
     });
   }
