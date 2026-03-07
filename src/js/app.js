@@ -68,6 +68,9 @@
       document.getElementById('page-' + p).classList.toggle('active', p === name);
     });
     document.getElementById('page-detail').classList.remove('active');
+    // Hide loading spinner when navigating away
+    const loadingEl = document.getElementById('detail-loading');
+    if (loadingEl) loadingEl.hidden = true;
     document.querySelectorAll('.nav-item').forEach(el => {
       el.classList.toggle('active', el.dataset.page === name);
     });
@@ -83,6 +86,9 @@
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     } else {
       document.getElementById('page-detail').classList.remove('active');
+      // Hide loading spinner when navigating away from detail
+      const loadingEl = document.getElementById('detail-loading');
+      if (loadingEl) loadingEl.hidden = true;
       showPage(hash);
     }
   }
@@ -168,42 +174,51 @@
       return;
     }
 
-    // 1. Check wordData IDB cache (instant if previously opened)
-    let entry = await DB.wordDataGet(word, dir);
-    console.log('[app] openDetail: wordDataGet result', { word, dir, entry });
+    // Show loading spinner
+    const loadingEl = document.getElementById('detail-loading');
+    if (loadingEl) loadingEl.hidden = false;
 
-    if (!entry) {
-      // 2. Not in IDB — fetch from data chunk and cache it (Layer 2)
-      entry = await Search.lookup(word, dir);
-      console.log('[app] openDetail: Search.lookup result', { word, dir, entry });
-      
+    try {
+      // 1. Check wordData IDB cache (instant if previously opened)
+      let entry = await DB.wordDataGet(word, dir);
+      console.log('[app] openDetail: wordDataGet result', { word, dir, entry });
+
       if (!entry) {
-        // Fallback: at minimum show the index row data
-        const indexRow = await DB.wordIndexGet(word, dir);
-        console.log('[app] openDetail: wordIndexGet fallback', { word, dir, indexRow });
-        entry = {
-          w:      word,
-          pos:    indexRow?.pos    || '',
-          gender: indexRow?.gender || null,
-          l1:     { en: indexRow?.hint ? [indexRow.hint] : [], ex: [] },
-        };
+        // 2. Not in IDB — fetch from data chunk and cache it (Layer 2)
+        entry = await Search.lookup(word, dir);
+        console.log('[app] openDetail: Search.lookup result', { word, dir, entry });
+        
+        if (!entry) {
+          // Fallback: at minimum show the index row data
+          const indexRow = await DB.wordIndexGet(word, dir);
+          console.log('[app] openDetail: wordIndexGet fallback', { word, dir, indexRow });
+          entry = {
+            w:      word,
+            pos:    indexRow?.pos    || '',
+            gender: indexRow?.gender || null,
+            l1:     { en: indexRow?.hint ? [indexRow.hint] : [], ex: [] },
+          };
+        }
       }
+
+      if (!entry || !entry.w) {
+        console.error('[app] openDetail: entry is invalid', { word, dir, entry });
+        UI.toast('Word not found');
+        return;
+      }
+
+      // Record in history with top-2 translations for quick display
+      const translations = (entry.l1?.en || []).slice(0, 2);
+      await DB.historyAdd(word, dir, translations);
+
+      state.currentEntry = { entry, dir };
+      await UI.renderDetail(entry, dir);
+      wireDetailBookmarkBtn(word, dir, entry);
+      location.hash = 'detail';
+    } finally {
+      // Hide loading spinner
+      if (loadingEl) loadingEl.hidden = true;
     }
-
-    if (!entry || !entry.w) {
-      console.error('[app] openDetail: entry is invalid', { word, dir, entry });
-      UI.toast('Word not found');
-      return;
-    }
-
-    // Record in history with top-2 translations for quick display
-    const translations = (entry.l1?.en || []).slice(0, 2);
-    await DB.historyAdd(word, dir, translations);
-
-    state.currentEntry = { entry, dir };
-    await UI.renderDetail(entry, dir);
-    wireDetailBookmarkBtn(word, dir, entry);
-    location.hash = 'detail';
   }
 
   function wireDetailBookmarkBtn(word, dir, entry) {
