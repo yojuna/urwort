@@ -3,35 +3,53 @@
 (async () => {
 
   // ── Seeding: run before anything else ─────────────────────────────────────
-  if (!Search.isSeeded()) {
-    const overlay   = document.getElementById('seed-overlay');
-    const bar       = document.getElementById('seed-bar');
-    const statusEl  = document.getElementById('seed-status');
+  const overlay   = document.getElementById('seed-overlay');
+  const bar       = document.getElementById('seed-bar');
+  const statusEl  = document.getElementById('seed-status');
 
-    overlay.hidden = false;
+  // Ensure overlay starts hidden
+  if (overlay) overlay.hidden = true;
+
+  if (!Search.isSeeded()) {
+    if (overlay) {
+      overlay.hidden = false;
+      overlay.style.display = 'flex'; // Force display in case CSS is missing
+    }
 
     try {
       let resumed = false;
       await Search.seed(({ done, total, letter, dir, resumed: isResumed }) => {
         if (isResumed && !resumed) {
           resumed = true;
-          statusEl.textContent = 'Resuming from previous session…';
+          if (statusEl) statusEl.textContent = 'Resuming from previous session…';
         }
         const pct = Math.round((done / total) * 100);
-        bar.style.width = pct + '%';
-        if (letter && dir) {
+        if (bar) bar.style.width = pct + '%';
+        if (letter && dir && statusEl) {
           statusEl.textContent = `${dir}  /  ${letter}.json  (${done}/${total})`;
         }
       });
     } catch (err) {
       // Seeding failed (e.g. offline on first launch)
-      statusEl.textContent = 'Failed to build dictionary. Please connect to the internet and reload.';
+      if (statusEl) {
+        statusEl.textContent = 'Failed to build dictionary. Please connect to the internet and reload.';
+      }
       console.error('[app] seeding error:', err);
       // Leave overlay visible — app is unusable without index
       return;
     }
 
-    overlay.hidden = true;
+    // Hide overlay after successful seeding
+    if (overlay) {
+      overlay.hidden = true;
+      overlay.style.display = 'none'; // Force hide
+    }
+  } else {
+    // Already seeded — ensure overlay is hidden
+    if (overlay) {
+      overlay.hidden = true;
+      overlay.style.display = 'none';
+    }
   }
 
   // ── State ──────────────────────────────────────────────────────────────────

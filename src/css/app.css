@@ -513,3 +513,79 @@ ul { list-style: none; }
   opacity: 0.5;
   font-style: italic;
 }
+
+/* ---------- Seeding overlay ---------- */
+.seed-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 10000; /* Above everything */
+  display: none; /* Hidden by default */
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  pointer-events: auto; /* Allow clicks when visible */
+}
+
+.seed-overlay:not([hidden]) {
+  display: flex; /* Show when not hidden */
+}
+
+.seed-overlay[hidden] {
+  display: none !important; /* Force hide when hidden attribute is set */
+  pointer-events: none !important; /* Ensure no clicks when hidden */
+  visibility: hidden !important;
+}
+
+.seed-box {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.seed-title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+  color: var(--accent);
+}
+
+.seed-subtitle {
+  font-size: 1.05rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.seed-bar-wrap {
+  background: var(--bg-card);
+  border-radius: 99px;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.seed-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.seed-status {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-height: 1.2em;
+  font-variant-numeric: tabular-nums;
+}
+
+.seed-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  line-height: 1.5;
+  margin-top: 8px;
+}
