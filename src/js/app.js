@@ -68,7 +68,6 @@
   searchInput.addEventListener('input', () => {
     const q = searchInput.value;
     clearBtn.hidden = q.length === 0;
-    if (q.length === 0) UI.hideSuggestions();
     // Auto-detect DE input via umlaut chars
     const detected = Search.detectDir(q);
     if (detected && detected !== state.dir) setDir(detected);
@@ -78,15 +77,9 @@
   clearBtn.addEventListener('click', () => {
     searchInput.value = '';
     clearBtn.hidden   = true;
-    UI.hideSuggestions();
     UI.renderResults(null, state.dir, state.bookmarkedSet);
     UI.setSearchStatus('');
     searchInput.focus();
-  });
-
-  // Dismiss dropdown when tapping outside
-  document.addEventListener('pointerdown', (e) => {
-    if (!e.target.closest('.search-input-wrap')) UI.hideSuggestions();
   });
 
   function runSearch(q) {
@@ -96,27 +89,8 @@
         return;
       }
       UI.renderResults(results, state.dir, state.bookmarkedSet);
-      // Show dropdown only when input is focused and has text
-      if (document.activeElement === searchInput && q.trim().length >= 2) {
-        UI.renderSuggestions(results, q.trim(), state.dir);
-      } else {
-        UI.hideSuggestions();
-      }
     });
   }
-
-  // ── Suggestion clicks ──────────────────────────────────────────────────────
-  document.getElementById('suggestions').addEventListener('pointerdown', (e) => {
-    // pointerdown so we fire before the input blur hides the dropdown
-    const item = e.target.closest('.suggestion-item');
-    if (!item) return;
-    e.preventDefault(); // keep input focus
-    const { word, dir } = item.dataset;
-    UI.hideSuggestions();
-    searchInput.value = word;
-    clearBtn.hidden = false;
-    openDetail(word, dir);
-  });
 
   // ── Result card clicks ─────────────────────────────────────────────────────
   document.getElementById('results-list').addEventListener('click', async (e) => {
@@ -139,7 +113,6 @@
 
   // ── Open word detail ───────────────────────────────────────────────────────
   async function openDetail(word, dir) {
-    UI.hideSuggestions();
     await DB.historyAdd(word, dir);
 
     // Layer 2 cache check first (offline-forever after first view)

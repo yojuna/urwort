@@ -23,43 +23,6 @@ const UI = (() => {
   }
 
   // ---- Suggestions dropdown ----
-  const MAX_SUGGESTIONS = 5;
-
-  // Highlight the query string inside the word (case-insensitive)
-  function highlightMatch(word, q) {
-    const idx = word.toLowerCase().indexOf(q.toLowerCase());
-    if (idx === -1) return word;
-    return word.slice(0, idx)
-      + `<mark>${word.slice(idx, idx + q.length)}</mark>`
-      + word.slice(idx + q.length);
-  }
-
-  function renderSuggestions(entries, q, dir) {
-    const el = document.getElementById('suggestions');
-    if (!entries || entries.length === 0) {
-      el.hidden = true;
-      el.innerHTML = '';
-      return;
-    }
-    const top = entries.slice(0, MAX_SUGGESTIONS);
-    el.innerHTML = top.map(entry => {
-      const trans = (entry.l1?.en || []).slice(0, 2).join(', ');
-      const gender = entry.gender ? ` <span style="color:var(--accent);font-size:0.75rem">${{ m:'der', f:'die', n:'das' }[entry.gender]}</span>` : '';
-      return `<li class="suggestion-item" role="option"
-                  data-word="${entry.w}" data-dir="${dir}">
-        <span class="suggestion-word">${highlightMatch(entry.w, q)}${gender}</span>
-        <span class="suggestion-meta">${trans}</span>
-      </li>`;
-    }).join('');
-    el.hidden = false;
-  }
-
-  function hideSuggestions() {
-    const el = document.getElementById('suggestions');
-    el.hidden = true;
-    el.innerHTML = '';
-  }
-
   const MAX_RESULTS = 5;
 
   // ---- Render a list of result cards ----
@@ -194,8 +157,6 @@ const UI = (() => {
   return {
     toast,
     renderResults,
-    renderSuggestions,
-    hideSuggestions,
     setSearchStatus,
     renderDetail,
     renderHistory,
