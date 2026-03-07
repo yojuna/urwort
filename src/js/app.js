@@ -138,15 +138,24 @@
 
   // ── Open word detail ───────────────────────────────────────────────────────
   async function openDetail(word, dir) {
+    if (!word || !dir) {
+      console.error('[app] openDetail: missing word or dir', { word, dir });
+      return;
+    }
+
     // 1. Check wordData IDB cache (instant if previously opened)
     let entry = await DB.wordDataGet(word, dir);
+    console.log('[app] openDetail: wordDataGet result', { word, dir, entry });
 
     if (!entry) {
       // 2. Not in IDB — fetch from data chunk and cache it (Layer 2)
       entry = await Search.lookup(word, dir);
+      console.log('[app] openDetail: Search.lookup result', { word, dir, entry });
+      
       if (!entry) {
         // Fallback: at minimum show the index row data
         const indexRow = await DB.wordIndexGet(word, dir);
+        console.log('[app] openDetail: wordIndexGet fallback', { word, dir, indexRow });
         entry = {
           w:      word,
           pos:    indexRow?.pos    || '',
@@ -154,6 +163,12 @@
           l1:     { en: indexRow?.hint ? [indexRow.hint] : [], ex: [] },
         };
       }
+    }
+
+    if (!entry || !entry.w) {
+      console.error('[app] openDetail: entry is invalid', { word, dir, entry });
+      UI.toast('Word not found');
+      return;
     }
 
     // Record in history with top-2 translations for quick display

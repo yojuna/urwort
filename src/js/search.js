@@ -97,15 +97,32 @@ const Search = (() => {
     debounceTimer = setTimeout(async () => {
       try {
         let results = await DB.wordIndexQuery(q, dir, MAX_RESULTS);
+        console.log('[search] wordIndexQuery raw results', { q, dir, count: results.length, first: results[0] });
 
         // If no results and not already capitalized, try capitalized form
         // (German nouns are capitalized, so "haus" → try "Haus")
         if (results.length === 0 && q[0] >= 'a' && q[0] <= 'z') {
           const qCap = q[0].toUpperCase() + q.slice(1);
           results = await DB.wordIndexQuery(qCap, dir, MAX_RESULTS);
+          console.log('[search] wordIndexQuery capitalized results', { qCap, dir, count: results.length });
         }
 
-        callback('done', results);
+        // Normalize IDB rows (word) to UI format (w)
+        const normalized = results.map(row => {
+          if (!row || !row.word) {
+            console.warn('[search] invalid row in results', row);
+            return null;
+          }
+          return {
+            w:      row.word,   // IDB has 'word', UI expects 'w'
+            pos:    row.pos,
+            gender: row.gender,
+            hint:   row.hint,
+          };
+        }).filter(Boolean); // Remove any null entries
+
+        console.log('[search] normalized results', { count: normalized.length, first: normalized[0] });
+        callback('done', normalized);
       } catch (err) {
         console.error('[search] IDB query error:', err);
         callback('done', []);

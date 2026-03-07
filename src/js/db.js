@@ -226,6 +226,39 @@ async function wordCachePut(entry, dir) {
   return wordDataPut(entry, dir);
 }
 
+// ── Debug helpers (exposed for console inspection) ──────────────────────────
+
+async function debugInspect() {
+  const stats = {
+    wordIndex: {
+      count: await db.wordIndex.count(),
+      sample: await db.wordIndex.limit(3).toArray(),
+    },
+    wordData: {
+      count: await db.wordData.count(),
+      sample: await db.wordData.limit(3).toArray(),
+    },
+    history: {
+      count: await db.history.count(),
+      sample: await db.history.limit(3).toArray(),
+    },
+    bookmarks: {
+      count: await db.bookmarks.count(),
+      sample: await db.bookmarks.limit(3).toArray(),
+    },
+  };
+  console.table(stats);
+  return stats;
+}
+
+async function debugSearchWord(word, dir) {
+  const indexRow = await wordIndexGet(word, dir);
+  const dataRow = await wordDataGet(word, dir);
+  const result = { word, dir, indexRow, dataRow };
+  console.log('[DB.debug]', result);
+  return result;
+}
+
 // ── Expose as global ──────────────────────────────────────────────────────────
 
 window.DB = {
@@ -248,4 +281,9 @@ window.DB = {
   // backward compatibility (deprecated)
   wordCacheGet,
   wordCachePut,
+  // debug
+  debug: {
+    inspect: debugInspect,
+    searchWord: debugSearchWord,
+  },
 };

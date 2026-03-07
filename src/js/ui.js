@@ -49,6 +49,10 @@ const UI = (() => {
       : `${total} result${total !== 1 ? 's' : ''}`;
 
     list.innerHTML = shown.map(entry => {
+      if (!entry || !entry.w) {
+        console.warn('[ui] renderResults: invalid entry', entry);
+        return '';
+      }
       const isBookmarked = bookmarkedSet.has(entry.w + '|' + dir);
       // Index rows (from wordIndex IDB) have `hint`; full entries have `l1.en`
       const trans = entry.hint
@@ -83,6 +87,15 @@ const UI = (() => {
 
   // ---- Render word detail page ----
   async function renderDetail(entry, dir) {
+    if (!entry || !entry.w) {
+      console.error('[ui] renderDetail: invalid entry', { entry, dir });
+      document.getElementById('word-detail').innerHTML = `
+        <div class="detail-word">Error: Word data not found</div>
+        <div class="detail-meta">Please try searching again.</div>
+      `;
+      return;
+    }
+
     const isBookmarked = await DB.bookmarkExists(entry.w, dir);
     const translationLabel = dir === 'de-en' ? 'English translations' : 'German translations';
     const dirLabel         = dir === 'de-en' ? '🇩🇪 → 🇬🇧' : '🇬🇧 → 🇩🇪';
