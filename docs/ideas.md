@@ -5,81 +5,105 @@ simple lightweight offline first privacy focused mobile progressive web app
 
 ## features
 - bidirectional dictionary (de→en and en→de)
-- curated deutsche resources
-- books / graded reading material
-- word search history
-- bookmarked / starred words
-- local offline caching via IndexedDB
+- curated deutsche resources page
+- word search history (with translation previews)
+- bookmarked / starred words (stored offline)
+- local offline caching via IndexedDB + service worker
 - PWA installable, works fully offline after first load
 
 ## confirmed design decisions
-- data: per-letter chunked json files (a.json … z.json), lazy loaded + cached on demand by service worker
-- search: as-you-type at ≥2 chars with debounce (~200ms)
-- direction: bidirectional (de→en and en→de)
+- data: per-letter chunked json files (a.json … z.json), lazy loaded + cached on demand
+- search: as-you-type at ≥2 chars with debounce (200ms), runs in a Web Worker
+- direction: bidirectional toggle (DE↔EN) in header; auto-detects German input via umlauts
 - verb conjugation / noun declension: out of scope for v1
+- top 5 results shown in main list; full entry on detail page
 
 ## tech stack
 - vanilla HTML + CSS + JS — zero build tools, zero npm
 - service worker + cache API — offline shell and data
-- indexedDB — search history, bookmarks, user progress
-- static json dictionary files — curated open source (freedict, kaikki.org)
-- hash-based routing (#search, #history, #bookmarks, #resources)
+- IndexedDB via Dexie.js — search history, bookmarks, word cache
+- Web Worker (search.worker.js) — search off the main thread
+- static JSON dictionary files — FreeDict (GPL), kaikki.org (CC-BY-SA, planned)
+- hash-based routing (#search, #history, #bookmarks, #resources, #settings, #detail)
+- docker + nginx for local dev and production deployment
 - deployed to github pages or cloudflare pages (free, static)
 
 ## dictionary data sources
-- freedict deu-eng (TEI XML → convert to JSON)
-- kaikki.org (wiktionary-derived JSON, ready to use)
-- separate tools/build-dict.py pipeline to normalize → output per-letter chunks
+- **FreeDict deu-eng / eng-deu** — StarDict format, parsed by tools/build-dict.py
+- **kaikki.org** — wiktionary-derived JSON, planned for richer data
+- **DWDS** — optional future API reference only (not bulk offline)
+- tools/build-dict.py pipeline: parse StarDict → merge senses → output per-letter JSON chunks
 
 ## project structure
+```
 urwort/
-├── index.html
-├── manifest.json
-├── sw.js
-├── css/app.css
-├── js/
-│   ├── app.js       # init, hash routing, state
-│   ├── db.js        # indexedDB wrapper
-│   ├── search.js    # search logic, debounce, ranking
-│   └── ui.js        # DOM rendering helpers
-├── data/
-│   ├── de-en/       # a.json … z.json  (german → english)
-│   └── en-de/       # a.json … z.json  (english → german)
-├── icons/
-└── docs/
+├── src/
+│   ├── index.html              # app shell (all pages inline)
+│   ├── manifest.json           # PWA manifest
+│   ├── sw.js                   # service worker
+│   ├── css/app.css             # mobile-first styles, dark mode
+│   ├── js/
+│   │   ├── app.js              # init, routing, event wiring
+│   │   ├── db.js               # IndexedDB via Dexie.js
+│   │   ├── search.js           # main-thread bridge to worker
+│   │   ├── search.worker.js    # search logic off-thread
+│   │   ├── ui.js               # DOM rendering helpers
+│   │   └── vendor/dexie.min.js
+│   ├── data/
+│   │   ├── de-en/              # a.json … z.json  (german → english)
+│   │   └── en-de/              # a.json … z.json  (english → german)
+│   └── icons/
+├── tools/
+│   └── build-dict.py           # data pipeline
+├── raw-data/freedict/          # source StarDict files (gitignored)
+├── docs/
+│   ├── ideas.md                # this file
+│   ├── architecture.md         # system design and components
+│   └── data-pipeline.md        # data sources, schema, build steps
+├── Dockerfile.dev / .prod
+├── docker-compose.dev.yml / prod.yml
+└── nginx.dev.conf / prod.conf
+```
 
-## implementation phases
-### phase 1 — shell & offline core
-- index.html mobile layout (search bar, bottom nav)
-- manifest.json + icons → PWA installable
-- sw.js → cache shell on install, data chunks on demand
-- app.css → mobile-first, system fonts, prefers-color-scheme dark mode
+## implementation status
+### done
+- [x] app shell (index.html, manifest, icons, PWA installable)
+- [x] service worker (shell pre-cache, data lazy-cache, offline fallback)
+- [x] bidirectional search via Web Worker with debounce + scoring
+- [x] per-letter JSON chunks for DE→EN and EN→DE (FreeDict)
+- [x] Dexie.js IndexedDB with layered schema (history, bookmarks, wordCache)
+- [x] search history with translation previews
+- [x] bookmarks (full entry stored offline)
+- [x] word detail page (translations, examples, gender badge)
+- [x] direction toggle in header (auto-detects German input)
+- [x] resources page (curated links)
+- [x] settings page (placeholder)
+- [x] docker dev (live reload via volume mount) and prod (baked, gzip)
+- [x] git repo at github.com/yojuna/urwort
 
-### phase 2 — dictionary search
-- load per-letter chunk on first keystroke for that letter
-- search.js: prefix match → substring match → ranked results
-- bidirectional: detect input language or let user toggle de/en
-- render: word, gender (for nouns), part of speech, translations, example
+### planned
+- [ ] kaikki.org data integration (richer translations + etymologies)
+- [ ] CEFR level tags (A1–C2) on entries
+- [ ] frequency ranking for result ordering
+- [ ] settings: theme toggle, clear data, default direction
+- [ ] graded reader texts (phase 4)
+- [ ] DWDS API Layer 3 (etymology on demand)
 
-### phase 3 — local persistence
-- db.js thin IndexedDB wrapper: save / get / list / delete
-- search history (last 100 entries)
-- bookmarked words
-- reading progress
-
-### phase 4 — resources & reading
-- curated links page (cached offline)
-- graded reader texts as embedded JSON/HTML
-
-### phase 5 — data pipeline (tools/)
-- tools/build-dict.py: pull freedict/kaikki → normalize → write per-letter chunks
-- dictionary published as standalone open-source artifact
-
-## data format (per entry)
+## data entry format
+```json
 {
-  "w": "Haus",
-  "pos": "noun",
+  "id":     "de_haus",
+  "w":      "Haus",
+  "pos":    "noun",
   "gender": "n",
-  "en": ["house", "home", "building"],
-  "ex": ["Das Haus ist groß."]
+  "meta":   { "freq": null, "level": null },
+  "l1": {
+    "en":  ["house", "home", "building"],
+    "ex":  ["Das Haus ist groß. :: The house is big."]
+  },
+  "sources": { "freedict": { "senses": 3 } }
 }
+```
+
+See `docs/data-pipeline.md` for full schema reference.
+See `docs/architecture.md` for system design and component details.
