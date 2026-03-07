@@ -85,6 +85,115 @@ const UI = (() => {
       : msg;
   }
 
+  // ---- Render Kaikki.org section (expandable card) ----
+  function renderKaikkiSection(entry) {
+    const kaikki = entry.sources?.kaikki;
+    
+    // No Kaikki data yet
+    if (!kaikki) {
+      return '';
+    }
+
+    // If attempted but failed (404, etc.)
+    if (kaikki.attempted && !kaikki.entries) {
+      return '';
+    }
+
+    // Has data — render expandable card
+    const wordId = entry.w.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    const cardId = `kaikki-${wordId}`;
+    
+    let content = '';
+
+    // Etymology
+    if (kaikki.etymology) {
+      content += `
+        <div class="kaikki-item">
+          <div class="kaikki-label">Etymology</div>
+          <div class="kaikki-value">${escapeHtml(kaikki.etymology)}</div>
+        </div>`;
+    }
+
+    // IPA pronunciation
+    if (kaikki.ipa && kaikki.ipa.length > 0) {
+      const uniqueIpa = [...new Set(kaikki.ipa)];
+      content += `
+        <div class="kaikki-item">
+          <div class="kaikki-label">Pronunciation</div>
+          <div class="kaikki-value">${uniqueIpa.map(ipa => `<span class="kaikki-ipa">/${escapeHtml(ipa)}/</span>`).join(' ')}</div>
+        </div>`;
+    }
+
+    // Audio links
+    if (kaikki.audio && kaikki.audio.length > 0) {
+      const audioLinks = kaikki.audio.filter(Boolean).slice(0, 3); // Limit to 3
+      content += `
+        <div class="kaikki-item">
+          <div class="kaikki-label">Audio</div>
+          <div class="kaikki-value">
+            ${audioLinks.map(url => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="kaikki-audio-link">🔊 Listen</a>`).join(' ')}
+          </div>
+        </div>`;
+    }
+
+    // Senses (definitions)
+    if (kaikki.allSenses && kaikki.allSenses.length > 0) {
+      content += `
+        <div class="kaikki-item">
+          <div class="kaikki-label">Definitions</div>
+          <div class="kaikki-senses">
+            ${kaikki.allSenses.map((sense, idx) => {
+              const glosses = sense.glosses || sense.raw_glosses || [];
+              const tags = sense.tags || [];
+              const synonyms = sense.synonyms || [];
+              return `
+                <div class="kaikki-sense">
+                  ${glosses.length > 0 ? `<div class="kaikki-gloss">${idx + 1}. ${glosses.map(g => escapeHtml(g)).join('; ')}</div>` : ''}
+                  ${tags.length > 0 ? `<div class="kaikki-tags">${tags.map(t => `<span class="kaikki-tag">${escapeHtml(t)}</span>`).join(' ')}</div>` : ''}
+                  ${synonyms.length > 0 ? `<div class="kaikki-synonyms">Synonyms: ${synonyms.map(s => escapeHtml(s)).join(', ')}</div>` : ''}
+                </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }
+
+    // Inflected forms
+    if (kaikki.allForms && kaikki.allForms.length > 0) {
+      const forms = kaikki.allForms.slice(0, 10); // Limit to 10 forms
+      content += `
+        <div class="kaikki-item">
+          <div class="kaikki-label">Forms</div>
+          <div class="kaikki-value">${forms.map(f => {
+            const form = typeof f === 'string' ? f : (f.form || f);
+            return `<span class="kaikki-form">${escapeHtml(form)}</span>`;
+          }).join(' ')}</div>
+        </div>`;
+    }
+
+    if (!content) {
+      return ''; // No content to show
+    }
+
+    return `
+      <div class="kaikki-card">
+        <button class="kaikki-toggle" id="${cardId}-toggle" aria-expanded="false" aria-controls="${cardId}-content">
+          <span class="kaikki-toggle-icon">▶</span>
+          <span class="kaikki-toggle-label">Kaikki.org (Wiktionary)</span>
+        </button>
+        <div class="kaikki-content" id="${cardId}-content" hidden>
+          ${content}
+        </div>
+      </div>`;
+  }
+
+  // Simple HTML escape helper
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // ---- Render word detail page ----
   async function renderDetail(entry, dir) {
     if (!entry || !entry.w) {
@@ -118,6 +227,8 @@ const UI = (() => {
         <div class="detail-examples">
           ${entry.l1.ex.map(e => `<div class="example-item">${e}</div>`).join('')}
         </div>` : ''}
+
+      ${renderKaikkiSection(entry)}
 
       <button class="bookmark-detail-btn ${isBookmarked ? 'bookmarked' : ''}"
               id="detail-bookmark-btn"

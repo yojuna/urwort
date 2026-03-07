@@ -28,6 +28,7 @@ const SHELL_ASSETS = [
   '/js/vendor/dexie.min.js',
   '/js/db.js',
   '/js/search.js',
+  '/js/kaikki.js',
   '/js/seed.worker.js',
   '/js/ui.js',
   '/js/app.js',

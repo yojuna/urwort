@@ -4,6 +4,7 @@
 # For production:  docker compose -f docker-compose.prod.yml up --build
 
 services:
+  # Nginx frontend (serves PWA static files)
   urwort-dev:
     build:
       context: .
@@ -14,4 +15,35 @@ services:
       - "0.0.0.0:8080:8080"
     volumes:
       - ./src:/usr/share/nginx/html:ro
+    depends_on:
+      - urwort-api
     restart: unless-stopped
+    networks:
+      - urwort-network
+
+  # FastAPI backend (kaikki.org enrichment API)
+  urwort-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: urwort-api:dev
+    container_name: urwort-api
+    ports:
+      - "0.0.0.0:8000:8000"  # Expose for direct testing
+    volumes:
+      - ./api:/app/api:ro  # Read-only in dev (or :rw for live reload)
+    environment:
+      - KAIKKI_API_HOST=0.0.0.0
+      - KAIKKI_API_PORT=8000
+      - KAIKKI_CACHE_TTL=86400
+      - KAIKKI_RATE_LIMIT_PER_MINUTE=100
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    networks:
+      - urwort-network
+    # For development: enable auto-reload (requires :rw volume)
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+networks:
+  urwort-network:
+    driver: bridge

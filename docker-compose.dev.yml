@@ -4,8 +4,10 @@
 # - src/ mounted as live volume → edit a file, refresh browser — no rebuild
 # - Port 8080 on all interfaces → accessible from phone on same WiFi
 # - All caching disabled (nginx.dev.conf)
+# - API service with auto-reload enabled
 
 services:
+  # Nginx frontend (serves PWA static files)
   urwort-dev:
     build:
       context: .
@@ -17,4 +19,35 @@ services:
     volumes:
       # Live-edit: any change to src/ is served immediately (no rebuild)
       - ./src:/usr/share/nginx/html:ro
+    depends_on:
+      - urwort-api
     restart: unless-stopped
+    networks:
+      - urwort-network
+
+  # FastAPI backend (kaikki.org enrichment API)
+  urwort-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: urwort-api:dev
+    container_name: urwort-api
+    ports:
+      - "0.0.0.0:8000:8000"  # Expose for direct testing
+    volumes:
+      - ./api:/app/api:rw  # Read-write for auto-reload in dev
+    environment:
+      - KAIKKI_API_HOST=0.0.0.0
+      - KAIKKI_API_PORT=8000
+      - KAIKKI_CACHE_TTL=86400
+      - KAIKKI_RATE_LIMIT_PER_MINUTE=100
+      - LOG_LEVEL=DEBUG  # More verbose in dev
+    restart: unless-stopped
+    networks:
+      - urwort-network
+    # Auto-reload enabled for development
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+networks:
+  urwort-network:
+    driver: bridge

@@ -352,6 +352,148 @@ ul { list-style: none; }
   color: var(--accent);
 }
 
+/* ---------- Kaikki.org card ---------- */
+.kaikki-card {
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.kaikki-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  background: var(--bg-card);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.kaikki-toggle:hover {
+  background: var(--bg-surface);
+}
+
+.kaikki-toggle-icon {
+  display: inline-block;
+  transition: transform 0.2s;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.kaikki-toggle-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.kaikki-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kaikki-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kaikki-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.kaikki-value {
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.kaikki-ipa {
+  font-family: 'Courier New', monospace;
+  background: var(--bg-card);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.kaikki-audio-link {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.kaikki-audio-link:hover {
+  background: var(--border);
+  text-decoration: none;
+}
+
+.kaikki-senses {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kaikki-sense {
+  padding: 10px;
+  background: var(--bg-card);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+}
+
+.kaikki-gloss {
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.kaikki-tags {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.kaikki-tag {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  color: var(--text-muted);
+}
+
+.kaikki-synonyms {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.kaikki-form {
+  display: inline-block;
+  margin-right: 8px;
+  margin-bottom: 4px;
+  padding: 3px 8px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: 'Courier New', monospace;
+}
+
 /* ---------- History & Bookmarks ---------- */
 .text-btn {
   font-size: 0.8rem;

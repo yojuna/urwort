@@ -214,11 +214,58 @@
       state.currentEntry = { entry, dir };
       await UI.renderDetail(entry, dir);
       wireDetailBookmarkBtn(word, dir, entry);
+      wireKaikkiToggle(word); // Wire expandable Kaikki card
       location.hash = 'detail';
+
+      // Background: enrich with Kaikki.org data (Layer 3)
+      // Only for German words (de-en direction), and only if online
+      if (dir === 'de-en' && navigator.onLine && !entry.sources?.kaikki) {
+        // Don't await — let it run in background
+        Kaikki.enrichEntry(entry, dir).then(enriched => {
+          // If detail page is still open for this word, re-render to show Kaikki data
+          if (state.currentEntry && state.currentEntry.entry.w === word && state.currentEntry.dir === dir) {
+            state.currentEntry.entry = enriched;
+            UI.renderDetail(enriched, dir);
+            wireDetailBookmarkBtn(word, dir, enriched);
+            wireKaikkiToggle(word); // Re-wire toggle after re-render
+          }
+        }).catch(err => {
+          console.warn('[app] Kaikki enrichment failed:', err);
+          // Silent fail — don't show error to user
+        });
+      }
     } finally {
       // Hide loading spinner
       if (loadingEl) loadingEl.hidden = true;
     }
+  }
+
+  // ── Wire Kaikki.org expandable card toggle ────────────────────────────────────
+  function wireKaikkiToggle(word) {
+    const wordId = word.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    const toggleId = `kaikki-${wordId}-toggle`;
+    const contentId = `kaikki-${wordId}-content`;
+    
+    const toggle = document.getElementById(toggleId);
+    const content = document.getElementById(contentId);
+    
+    if (!toggle || !content) return; // No Kaikki card for this word
+    
+    // Remove any existing listeners by cloning
+    const freshToggle = toggle.cloneNode(true);
+    toggle.parentNode.replaceChild(freshToggle, toggle);
+    
+    freshToggle.addEventListener('click', () => {
+      const isExpanded = freshToggle.getAttribute('aria-expanded') === 'true';
+      freshToggle.setAttribute('aria-expanded', !isExpanded);
+      content.hidden = isExpanded;
+      
+      // Rotate icon
+      const icon = freshToggle.querySelector('.kaikki-toggle-icon');
+      if (icon) {
+        icon.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(90deg)';
+      }
+    });
   }
 
   function wireDetailBookmarkBtn(word, dir, entry) {
