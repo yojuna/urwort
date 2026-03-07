@@ -17,7 +17,11 @@
   <!-- App Header -->
   <header class="app-header">
     <span class="app-logo">urwort</span>
-    <span class="app-tagline">de ↔ en</span>
+    <div class="header-dir-toggle">
+      <button id="btn-de-en" class="header-toggle-btn active" data-dir="de-en">DE</button>
+      <span class="header-toggle-sep">↔</span>
+      <button id="btn-en-de" class="header-toggle-btn" data-dir="en-de">EN</button>
+    </div>
   </header>
 
   <!-- Pages (only one visible at a time via hash routing) -->
@@ -26,10 +30,6 @@
     <!-- SEARCH PAGE -->
     <section id="page-search" class="page active">
       <div class="search-bar-wrap">
-        <div class="direction-toggle">
-          <button id="btn-de-en" class="toggle-btn active" data-dir="de-en">DE → EN</button>
-          <button id="btn-en-de" class="toggle-btn" data-dir="en-de">EN → DE</button>
-        </div>
         <div class="search-input-wrap">
           <input
             id="search-input"
@@ -44,7 +44,7 @@
           />
           <button id="search-clear" class="search-clear" aria-label="Clear search" hidden>✕</button>
         </div>
-      </div>
+      </div><!-- /.search-bar-wrap -->
 
       <div id="search-status" class="search-status"></div>
       <ul id="results-list" class="results-list" role="list" aria-live="polite"></ul>
