@@ -9,17 +9,18 @@ Thumbs.db
 *.swo
 
 # Docker
-.docker/
+.env
 
-# Python (future data pipeline tooling)
+# Python (for future tools/ data pipeline)
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
 venv/
-*.egg-info/
+dist/
+build/
 
-# Large generated data — real dictionary chunks go here,
-# committed separately or fetched by the build pipeline.
-# Remove these lines if you want to commit data into the repo.
-# src/data/de-en/
-# src/data/en-de/
+# Data pipeline output — large generated files, not committed
+# (only the dummy/curated sample files in src/data/ are committed)
+tools/output/
+tools/*.log
