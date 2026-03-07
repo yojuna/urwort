@@ -113,8 +113,6 @@
 
   // ── Open word detail ───────────────────────────────────────────────────────
   async function openDetail(word, dir) {
-    await DB.historyAdd(word, dir);
-
     // Layer 2 cache check first (offline-forever after first view)
     let entry = await DB.wordCacheGet(word, dir);
 
@@ -128,6 +126,10 @@
         entry = { w: word, pos: '', gender: null, l1: { en: [], ex: [] } };
       }
     }
+
+    // Record history with translations available for quick display
+    const translations = (entry.l1?.en || []).slice(0, 2);
+    await DB.historyAdd(word, dir, translations);
 
     state.currentEntry = { entry, dir };
     await UI.renderDetail(entry, dir);

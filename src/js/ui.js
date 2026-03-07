@@ -122,13 +122,16 @@ const UI = (() => {
       return;
     }
     empty.hidden = true;
-    list.innerHTML = items.map(item => `
+    list.innerHTML = items.map(item => {
+      const trans = (item.translations || []).join(', ');
+      return `
       <li class="result-card" data-word="${item.word}" data-dir="${item.dir}">
         <div class="result-left">
           <div class="result-word">${item.word}</div>
-          <div class="result-translations">${item.dir === 'de-en' ? 'DE → EN' : 'EN → DE'}</div>
+          ${trans ? `<div class="result-translations">${trans}</div>` : ''}
         </div>
-      </li>`).join('');
+      </li>`;
+    }).join('');
   }
 
   // ---- Render bookmarks list ----

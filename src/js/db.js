@@ -46,11 +46,14 @@ db.version(3).stores({
 
 /**
  * Record a search. Deduplicates by word+dir (keeps newest timestamp).
+ * @param {string} word
+ * @param {string} dir   'de-en' | 'en-de'
+ * @param {string[]} [translations]  top-2 translations to show in history list
  */
-async function historyAdd(word, dir) {
+async function historyAdd(word, dir, translations = []) {
   // Compound index [word+dir] makes this dedup query fast
   await db.history.where('[word+dir]').equals([word, dir]).delete();
-  return db.history.add({ word, dir, ts: Date.now() });
+  return db.history.add({ word, dir, translations, ts: Date.now() });
 }
 
 /**
