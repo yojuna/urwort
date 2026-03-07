@@ -71,6 +71,36 @@
       <p id="bookmarks-empty" class="empty-msg" hidden>No bookmarks yet.</p>
     </section>
 
+    <!-- SETTINGS PAGE -->
+    <section id="page-settings" class="page">
+      <h2 class="page-title">Settings</h2>
+      <div class="settings-placeholder">
+        <p class="settings-note">Settings and configuration options coming soon.</p>
+        <ul class="settings-list">
+          <li class="settings-item">
+            <span class="settings-label">Default direction</span>
+            <span class="settings-value settings-todo">DE → EN</span>
+          </li>
+          <li class="settings-item">
+            <span class="settings-label">Theme</span>
+            <span class="settings-value settings-todo">System default</span>
+          </li>
+          <li class="settings-item">
+            <span class="settings-label">Data sources</span>
+            <span class="settings-value settings-todo">FreeDict</span>
+          </li>
+          <li class="settings-item">
+            <span class="settings-label">Cache size</span>
+            <span class="settings-value settings-todo">—</span>
+          </li>
+          <li class="settings-item">
+            <span class="settings-label">Clear all data</span>
+            <span class="settings-value settings-todo">—</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
     <!-- RESOURCES PAGE -->
     <section id="page-resources" class="page">
       <h2 class="page-title">Resources</h2>
@@ -87,21 +117,20 @@
 
   <!-- Bottom Navigation -->
   <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
-    <a href="#search"    class="nav-item active" data-page="search">
+    <a href="#search"    class="nav-item active" data-page="search"    aria-label="Search">
       <span class="nav-icon">🔍</span>
-      <span class="nav-label">Search</span>
     </a>
-    <a href="#history"   class="nav-item" data-page="history">
+    <a href="#history"   class="nav-item" data-page="history"   aria-label="History">
       <span class="nav-icon">🕐</span>
-      <span class="nav-label">History</span>
     </a>
-    <a href="#bookmarks" class="nav-item" data-page="bookmarks">
+    <a href="#bookmarks" class="nav-item" data-page="bookmarks" aria-label="Bookmarks">
       <span class="nav-icon">🔖</span>
-      <span class="nav-label">Bookmarks</span>
     </a>
-    <a href="#resources" class="nav-item" data-page="resources">
+    <a href="#resources" class="nav-item" data-page="resources" aria-label="Resources">
       <span class="nav-icon">📚</span>
-      <span class="nav-label">Resources</span>
+    </a>
+    <a href="#settings"  class="nav-item" data-page="settings"  aria-label="Settings">
+      <span class="nav-icon">⚙️</span>
     </a>
   </nav>
 

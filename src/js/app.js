@@ -10,7 +10,7 @@
   };
 
   // ── Routing ────────────────────────────────────────────────────────────────
-  const PAGES = ['search', 'history', 'bookmarks', 'resources'];
+  const PAGES = ['search', 'history', 'bookmarks', 'resources', 'settings'];
 
   function showPage(name) {
     if (!PAGES.includes(name)) name = 'search';

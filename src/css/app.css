@@ -409,10 +409,8 @@ ul { list-style: none; }
 .nav-item {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
   color: var(--text-muted);
   transition: color 0.15s;
   -webkit-tap-highlight-color: transparent;
@@ -421,8 +419,7 @@ ul { list-style: none; }
 
 .nav-item.active { color: var(--accent); }
 
-.nav-icon { font-size: 1.3rem; line-height: 1; }
-.nav-label { font-size: 0.65rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
+.nav-icon { font-size: 1.4rem; line-height: 1; }
 
 /* ---------- Toast ---------- */
 .toast {
@@ -461,3 +458,46 @@ ul { list-style: none; }
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Settings page ---------- */
+.settings-placeholder {
+  padding: 8px 0;
+}
+
+.settings-note {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  font-style: italic;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.settings-label {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.settings-value {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.settings-todo {
+  opacity: 0.5;
+  font-style: italic;
+}
