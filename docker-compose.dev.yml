@@ -1,0 +1,20 @@
+# docker-compose.dev.yml
+# Usage:  docker compose -f docker-compose.dev.yml up
+#
+# - src/ mounted as live volume → edit a file, refresh browser — no rebuild
+# - Port 8080 on all interfaces → accessible from phone on same WiFi
+# - All caching disabled (nginx.dev.conf)
+
+services:
+  urwort-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: urwort:dev
+    container_name: urwort-dev
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      # Live-edit: any change to src/ is served immediately (no rebuild)
+      - ./src:/usr/share/nginx/html:ro
+    restart: unless-stopped

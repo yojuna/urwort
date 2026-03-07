@@ -1,0 +1,18 @@
+# docker-compose.prod.yml
+# Usage:  docker compose -f docker-compose.prod.yml up --build
+#
+# - src/ baked into the image at build time
+# - Gzip on, aggressive caching (nginx.prod.conf)
+# - No volume mount — image is self-contained, ready to push to a registry
+# - Port 8080 on all interfaces
+
+services:
+  urwort:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: urwort:latest
+    container_name: urwort
+    ports:
+      - "0.0.0.0:8080:8080"
+    restart: unless-stopped

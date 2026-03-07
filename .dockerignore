@@ -1,0 +1,37 @@
+# .dockerignore
+# Keeps the Docker build context small and fast.
+# Only src/ and nginx configs need to enter the build context.
+
+# Version control
+.git
+.gitignore
+.github
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+*.md
+
+# Docker files themselves (not needed inside image)
+Dockerfile*
+docker-compose*.yml
+
+# Tools / data pipeline
+tools/
+raw-data/
+
+# Node (if ever added)
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
