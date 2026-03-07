@@ -34,14 +34,22 @@ db.version(2).stores({
   wordCache: 'id, word, dir, cachedAt',
 });
 
+// v3: add compound indexes [word+dir] to silence Dexie perf warnings
+//     and speed up dedup queries in historyAdd / bookmarkExists
+db.version(3).stores({
+  history:   '++id, word, dir, ts, [word+dir]',
+  bookmarks: 'id, word, dir, savedAt, [word+dir]',
+  wordCache: 'id, word, dir, cachedAt',
+});
+
 // ── History ──────────────────────────────────────────────────────────────────
 
 /**
  * Record a search. Deduplicates by word+dir (keeps newest timestamp).
  */
 async function historyAdd(word, dir) {
-  // Delete any existing entry for this word+dir pair
-  await db.history.where({ word, dir }).delete();
+  // Compound index [word+dir] makes this dedup query fast
+  await db.history.where('[word+dir]').equals([word, dir]).delete();
   return db.history.add({ word, dir, ts: Date.now() });
 }
 
