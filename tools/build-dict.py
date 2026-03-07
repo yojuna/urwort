@@ -1,42 +1,21 @@
 #!/usr/bin/env python3
 """
-tools/build-dict.py
+tools/build-dict.py  (v2)
 
-Reads two FreeDict StarDict dictionaries and outputs per-letter JSON chunks:
+Outputs TWO sets of per-letter JSON chunks per direction:
 
-  Sources:
-    raw-data/freedict/deu-eng/  →  DE→EN  (517k headword entries)
-    raw-data/freedict/eng-deu/  →  EN→DE  (460k headword entries)
+  src/data/{dir}/index/{letter}.json  -- Layer 1 slim rows (w, pos, gender, hint)
+  src/data/{dir}/data/{letter}.json   -- Layer 2 full rows (w, pos, gender, l1, sources)
 
-  Output:
-    src/data/de-en/{a..z,misc}.json   German  → English
-    src/data/en-de/{a..z,misc}.json   English → German
-
-Both dicts use the same StarDict HTML format:
-  - <font color="green">pos info</font>  e.g. "male, noun, sg" or "verb, intr"
-  - <div lang="en"> or <div lang="de">   for translations
-  - <div class="example">               for bilingual examples
-  - Multiple idx entries per headword   (one per sense — merged by this script)
-
-Entry schema (Option B — index + examples bundled):
-{
-  "id":     "de_Haus",
-  "w":      "Haus",
-  "pos":    "noun",
-  "gender": "n",
-  "meta":   { "freq": null, "level": null },
-  "l1": {
-    "en":  ["house", "home", "building"],
-    "ex":  ["Das Haus ist groß. :: The house is big."]
-  },
-  "sources": { "freedict": { "senses": 3 } }
-}
+Sources:
+  raw-data/freedict/deu-eng/  ->  DE->EN
+  raw-data/freedict/eng-deu/  ->  EN->DE
 
 Usage:
-  cd /path/to/urwort
-  python3 tools/build-dict.py             # full build
-  python3 tools/build-dict.py --dry-run   # stats only, no files written
-  python3 tools/build-dict.py --limit 2000  # quick test with first N headwords
+  python3 tools/build-dict.py               # full build
+  python3 tools/build-dict.py --dry-run     # stats only
+  python3 tools/build-dict.py --limit 2000  # quick test
+  python3 tools/build-dict.py --direction de-en
 """
 
 import argparse
@@ -49,7 +28,9 @@ import sys
 from collections import defaultdict
 from html.parser import HTMLParser
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 ROOT         = os.path.dirname(SCRIPT_DIR)
@@ -59,35 +40,31 @@ OUT_EN_DE    = os.path.join(ROOT, "src", "data", "en-de")
 
 DICTS = {
     "de-en": {
-        "idx":  os.path.join(FREEDICT_DIR, "deu-eng", "deu-eng.idx.gz"),
-        "dict": os.path.join(FREEDICT_DIR, "deu-eng", "deu-eng.dict.dz"),
-        "trans_lang": "en",   # translation nodes are lang="en"
-        "out":  OUT_DE_EN,
+        "idx":        os.path.join(FREEDICT_DIR, "deu-eng", "deu-eng.idx.gz"),
+        "dict":       os.path.join(FREEDICT_DIR, "deu-eng", "deu-eng.dict.dz"),
+        "trans_lang": "en",
+        "out":        OUT_DE_EN,
     },
     "en-de": {
-        "idx":  os.path.join(FREEDICT_DIR, "eng-deu", "eng-deu.idx.gz"),
-        "dict": os.path.join(FREEDICT_DIR, "eng-deu", "eng-deu.dict.dz"),
-        "trans_lang": "de",   # translation nodes are lang="de"
-        "out":  OUT_EN_DE,
+        "idx":        os.path.join(FREEDICT_DIR, "eng-deu", "eng-deu.idx.gz"),
+        "dict":       os.path.join(FREEDICT_DIR, "eng-deu", "eng-deu.dict.dz"),
+        "trans_lang": "de",
+        "out":        OUT_EN_DE,
     },
 }
 
-# ── HTML Parser ───────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# HTML Parser
+# ---------------------------------------------------------------------------
 
 class EntryParser(HTMLParser):
-    """
-    Extract structured data from one StarDict HTML sense-entry.
-    Handles both deu-eng (lang="en" translations) and eng-deu (lang="de").
-    """
-    def __init__(self, trans_lang: str):
+    def __init__(self, trans_lang):
         super().__init__()
-        self.trans_lang   = trans_lang   # "en" or "de"
+        self.trans_lang   = trans_lang
         self.translations = []
-        self.examples_src = []           # source language example text
-        self.examples_tgt = []           # target language example text
+        self.examples_src = []
+        self.examples_tgt = []
         self.pos_raw      = ""
-        self.gender_raw   = ""
-
         self._depth         = 0
         self._in_example    = False
         self._example_depth = 0
@@ -98,17 +75,14 @@ class EntryParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         self._depth += 1
-        attrs_d = dict(attrs)
-        lang    = attrs_d.get("lang", "")
-        cls     = attrs_d.get("class", "")
-        color   = attrs_d.get("color", "")
-
+        a = dict(attrs)
+        lang  = a.get("lang", "")
+        cls   = a.get("class", "")
+        color = a.get("color", "")
         if cls == "example":
             self._in_example    = True
             self._example_depth = self._depth
-
         if self._in_example:
-            # In example: source lang is the opposite of trans_lang
             src_lang = "de" if self.trans_lang == "en" else "en"
             if lang == self.trans_lang:
                 self._in_tgt_ex = True
@@ -117,7 +91,6 @@ class EntryParser(HTMLParser):
         else:
             if lang == self.trans_lang:
                 self._in_trans = True
-
         if tag == "font" and color == "green":
             self._in_pos = True
 
@@ -135,7 +108,6 @@ class EntryParser(HTMLParser):
         if not data:
             return
         if self._in_pos:
-            # e.g. "male, noun, sg"  or  "verb, intr"  or  "female, noun"
             self.pos_raw += " " + data
         elif self._in_tgt_ex:
             self.examples_tgt.append(data)
@@ -145,15 +117,7 @@ class EntryParser(HTMLParser):
             self.translations.append(data)
 
 
-def parse_pos_gender(pos_raw: str):
-    """
-    Parse the <font color="green"> text into (pos, gender).
-    Examples: "male, noun, sg" → ("noun","m")
-              "female, noun"   → ("noun","f")
-              "neuter, noun"   → ("noun","n")
-              "verb, intr"     → ("verb", None)
-              "adjective"      → ("adjective", None)
-    """
+def parse_pos_gender(pos_raw):
     s = pos_raw.lower()
     gender = None
     if "male, noun" in s or "masculine" in s:
@@ -164,31 +128,22 @@ def parse_pos_gender(pos_raw: str):
         gender = "n"
     elif "male" in s and "noun" in s:
         gender = "m"
-
     pos = ""
-    if "noun" in s:
-        pos = "noun"
-    elif "verb" in s:
-        pos = "verb"
-    elif "adj" in s:
-        pos = "adjective"
-    elif "adv" in s:
-        pos = "adverb"
-    elif "prep" in s:
-        pos = "preposition"
-    elif "conj" in s:
-        pos = "conjunction"
-    elif "pron" in s:
-        pos = "pronoun"
-    elif "article" in s or "art." in s:
-        pos = "article"
+    if "noun" in s:          pos = "noun"
+    elif "verb" in s:        pos = "verb"
+    elif "adj" in s:         pos = "adjective"
+    elif "adv" in s:         pos = "adverb"
+    elif "prep" in s:        pos = "preposition"
+    elif "conj" in s:        pos = "conjunction"
+    elif "pron" in s:        pos = "pronoun"
+    elif "article" in s or "art." in s: pos = "article"
     return pos, gender
 
+# ---------------------------------------------------------------------------
+# StarDict reader
+# ---------------------------------------------------------------------------
 
-# ── StarDict reader ───────────────────────────────────────────────────────────
-
-def read_stardict(idx_path: str, dict_path: str):
-    """Generator — yields (headword: str, html: str) for every idx entry."""
+def read_stardict(idx_path, dict_path):
     print(f"  Reading index  : {os.path.basename(idx_path)}", file=sys.stderr)
     with gzip.open(idx_path, "rb") as f:
         idx_raw = f.read()
@@ -196,67 +151,48 @@ def read_stardict(idx_path: str, dict_path: str):
     with gzip.open(dict_path, "rb") as f:
         dict_raw = f.read()
     print(f"  Index {len(idx_raw):,}B  |  Dict {len(dict_raw):,}B", file=sys.stderr)
-
     i = 0
     while i < len(idx_raw):
         try:
             null_pos = idx_raw.index(b"\x00", i)
         except ValueError:
             break
-        word   = idx_raw[i:null_pos].decode("utf-8", errors="replace")
+        word = idx_raw[i:null_pos].decode("utf-8", errors="replace")
         offset, size = struct.unpack(">II", idx_raw[null_pos + 1: null_pos + 9])
-        html   = dict_raw[offset: offset + size].decode("utf-8", errors="replace")
-        i      = null_pos + 9
+        html = dict_raw[offset: offset + size].decode("utf-8", errors="replace")
+        i = null_pos + 9
         yield word, html
 
+# ---------------------------------------------------------------------------
+# Filtering
+# ---------------------------------------------------------------------------
 
-# ── Filtering ─────────────────────────────────────────────────────────────────
-
-# Skip headwords that are:
-#   - quoted phrases / idioms (start with " or ')
-#   - purely numeric or symbolic
-#   - too short or too long
 SKIP_START_RE = re.compile(r'^[\"\'\d\W]')
 
-def should_skip(word: str) -> bool:
+def should_skip(word):
     if len(word) < 2 or len(word) > 60:
         return True
     if SKIP_START_RE.match(word):
         return True
-    # Skip if contains brackets, ellipsis
     if any(c in word for c in "()[]{}..."):
         return True
     return False
 
+def clean_translation(t):
+    return re.sub(r'\s+', ' ', t).strip()
 
-def clean_translation(t: str) -> str:
-    """Strip noise from a translation string."""
-    # Remove trailing context labels like "(wire drawing)"
-    t = re.sub(r'\s+', ' ', t).strip()
-    return t
+# ---------------------------------------------------------------------------
+# Core builder
+# ---------------------------------------------------------------------------
 
-
-# ── Core builder ─────────────────────────────────────────────────────────────
-
-def build_direction(direction: str, trans_lang: str,
-                    idx_path: str, dict_path: str,
-                    limit=None) -> list:
-    """
-    Parse a StarDict dictionary and return merged entry list.
-    Multiple idx entries sharing the same headword (one per sense)
-    are merged into a single entry with combined translations/examples.
-    """
-    # Accumulator: headword → merged data
-    # Using OrderedDict-like insertion order via plain dict (Python 3.7+)
-    merged = {}   # word → { pos, gender, translations[], examples[], sense_count }
-
+def build_direction(direction, trans_lang, idx_path, dict_path, limit=None):
+    merged    = {}
     total_idx = 0
     skipped   = 0
     limit_hit = False
 
     for word, html in read_stardict(idx_path, dict_path):
         total_idx += 1
-
         if should_skip(word):
             skipped += 1
             continue
@@ -269,17 +205,15 @@ def build_direction(direction: str, trans_lang: str,
 
         pos, gender = parse_pos_gender(p.pos_raw)
 
-        # Clean translations
+        existing_trans = merged[word]["translations"] if word in merged else []
+        seen_set = set(t.lower() for t in existing_trans)
         clean_trans = []
-        seen_trans  = merged[word]["translations"] if word in merged else []
-        seen_set    = set(t.lower() for t in seen_trans)
         for t in p.translations:
             t = clean_translation(t)
             if t and len(t) < 100 and t.lower() not in seen_set:
                 clean_trans.append(t)
                 seen_set.add(t.lower())
 
-        # Build examples "source :: target"
         new_examples = []
         for src, tgt in zip(p.examples_src, p.examples_tgt):
             src = src.strip(); tgt = tgt.strip()
@@ -288,117 +222,148 @@ def build_direction(direction: str, trans_lang: str,
 
         if word not in merged:
             merged[word] = {
-                "pos":         pos,
-                "gender":      gender,
+                "pos":          pos,
+                "gender":       gender,
                 "translations": clean_trans,
-                "examples":    new_examples,
-                "senses":      1,
+                "examples":     new_examples,
+                "senses":       1,
             }
         else:
-            # Merge into existing entry
             m = merged[word]
-            if pos and not m["pos"]:
-                m["pos"] = pos
-            if gender and not m["gender"]:
-                m["gender"] = gender
+            if pos and not m["pos"]:       m["pos"]    = pos
+            if gender and not m["gender"]: m["gender"] = gender
             m["translations"].extend(clean_trans)
-            m["examples"].extend(
-                e for e in new_examples if e not in m["examples"]
-            )
+            m["examples"].extend(e for e in new_examples if e not in m["examples"])
             m["senses"] += 1
 
-        # Apply limit based on unique headwords
         if limit and len(merged) >= limit:
             limit_hit = True
             break
 
-    # Convert to entry list
     entries = []
     empty   = 0
     for word, data in merged.items():
         if not data["translations"]:
             empty += 1
             continue
-        entry = {
-            "id":     f"{direction[:2]}_{word.lower().replace(' ', '_').replace('/', '_')}",
+        entries.append({
             "w":      word,
             "pos":    data["pos"],
             "gender": data["gender"],
-            "meta":   {"freq": None, "level": None},
             "l1": {
-                "en":  data["translations"][:6],   # cap 6 translations
-                "ex":  data["examples"][:3],        # cap 3 examples
+                "en": data["translations"][:6],
+                "ex": data["examples"][:3],
             },
             "sources": {"freedict": {"senses": data["senses"]}},
-        }
-        entries.append(entry)
+        })
 
     print(
-        f"  {direction}: {total_idx:,} idx rows → {len(merged):,} unique words "
-        f"→ {len(entries):,} entries  "
+        f"  {direction}: {total_idx:,} idx rows -> {len(merged):,} unique words "
+        f"-> {len(entries):,} entries  "
         f"({skipped:,} skipped, {empty:,} no-translation"
         f"{', LIMIT HIT' if limit_hit else ''})",
         file=sys.stderr
     )
     return entries
 
+# ---------------------------------------------------------------------------
+# Chunker
+# ---------------------------------------------------------------------------
 
-# ── Chunker & writer ──────────────────────────────────────────────────────────
+UMLAUT_MAP = {"ae": "a", "oe": "o", "ue": "u",
+              "\u00e4": "a", "\u00f6": "o", "\u00fc": "u",
+              "\u00df": "s", "\u00c4": "a", "\u00d6": "o", "\u00dc": "u"}
 
-def chunk_by_letter(entries: list) -> dict:
+def chunk_by_letter(entries):
     chunks = defaultdict(list)
     for entry in entries:
         first = entry["w"][0].lower()
         if "a" <= first <= "z":
             chunks[first].append(entry)
         else:
-            # German umlauts etc. → map to base letter
-            umlaut_map = {"ä": "a", "ö": "o", "ü": "u", "ß": "s"}
-            mapped = umlaut_map.get(first, "misc")
-            chunks[mapped].append(entry)
+            chunks[UMLAUT_MAP.get(first, "misc")].append(entry)
     return chunks
 
+# ---------------------------------------------------------------------------
+# Writers
+# ---------------------------------------------------------------------------
 
-def write_chunks(chunks: dict, out_dir: str, dry_run: bool):
-    os.makedirs(out_dir, exist_ok=True)
-    total    = 0
-    total_kb = 0
+def make_index_row(entry):
+    """Slim row for wordIndex (Layer 1). Only what a search card needs."""
+    hint = entry["l1"]["en"][0] if entry["l1"]["en"] else ""
+    row = {"w": entry["w"], "hint": hint}
+    if entry["pos"]:    row["pos"]    = entry["pos"]
+    if entry["gender"]: row["gender"] = entry["gender"]
+    return row
+
+
+def write_chunks(chunks, out_dir, dry_run):
+    """
+    Write index/ and data/ sub-directories.
+      index/{letter}.json  -- slim rows (w, hint, pos?, gender?)
+      data/{letter}.json   -- full rows (w, pos, gender, l1, sources)
+    """
+    index_dir = os.path.join(out_dir, "index")
+    data_dir  = os.path.join(out_dir, "data")
+
+    if not dry_run:
+        os.makedirs(index_dir, exist_ok=True)
+        os.makedirs(data_dir,  exist_ok=True)
+
+    total_entries  = 0
+    index_total_kb = 0.0
+    data_total_kb  = 0.0
+
+    print(f"\n  {'letter':8}  {'entries':>8}  {'index KB':>9}  {'data KB':>8}", file=sys.stderr)
+    print(f"  {'-'*8}  {'-'*8}  {'-'*9}  {'-'*8}", file=sys.stderr)
+
     for letter, entries in sorted(chunks.items()):
         entries.sort(key=lambda e: e["w"].lower())
-        data     = json.dumps(entries, ensure_ascii=False, separators=(",", ":"))
-        size_kb  = len(data.encode("utf-8")) / 1024
-        total_kb += size_kb
-        total    += len(entries)
-        flag      = "  (would write)" if dry_run else ""
+
+        index_rows = [make_index_row(e) for e in entries]
+        index_json = json.dumps(index_rows, ensure_ascii=False, separators=(",", ":"))
+        data_json  = json.dumps(entries,    ensure_ascii=False, separators=(",", ":"))
+
+        index_kb = len(index_json.encode("utf-8")) / 1024
+        data_kb  = len(data_json.encode("utf-8"))  / 1024
+        index_total_kb += index_kb
+        data_total_kb  += data_kb
+        total_entries  += len(entries)
+
+        flag = "  (dry)" if dry_run else ""
         print(
-            f"    {letter}.json  {len(entries):>6,} entries  {size_kb:>7.1f} KB{flag}",
+            f"  {letter+'.json':8}  {len(entries):>8,}  {index_kb:>8.1f}K  {data_kb:>7.1f}K{flag}",
             file=sys.stderr
         )
+
         if not dry_run:
-            path = os.path.join(out_dir, f"{letter}.json")
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(data)
+            with open(os.path.join(index_dir, f"{letter}.json"), "w", encoding="utf-8") as f:
+                f.write(index_json)
+            with open(os.path.join(data_dir, f"{letter}.json"), "w", encoding="utf-8") as f:
+                f.write(data_json)
+
+    total_mb_index = index_total_kb / 1024
+    total_mb_data  = data_total_kb  / 1024
     print(
-        f"  → {total:,} total entries  ~{total_kb/1024:.1f} MB  in {out_dir}",
+        f"\n  -> {total_entries:,} entries | "
+        f"index {total_mb_index:.1f} MB | "
+        f"data {total_mb_data:.1f} MB",
         file=sys.stderr
     )
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Build urwort per-letter JSON chunks from FreeDict StarDict files"
+        description="Build urwort per-letter JSON chunks (v2: index/ + data/ split)"
     )
-    ap.add_argument("--dry-run", action="store_true",
-                    help="Print stats only, don't write output files")
-    ap.add_argument("--limit", type=int, default=None,
-                    help="Stop after N unique headwords per direction (for quick testing)")
-    ap.add_argument("--direction", choices=["de-en", "en-de", "both"], default="both",
-                    help="Which direction(s) to build (default: both)")
+    ap.add_argument("--dry-run",   action="store_true")
+    ap.add_argument("--limit",     type=int, default=None)
+    ap.add_argument("--direction", choices=["de-en", "en-de", "both"], default="both")
     args = ap.parse_args()
 
-    # Validate source files exist
     for key, cfg in DICTS.items():
         if args.direction != "both" and key != args.direction:
             continue
@@ -410,9 +375,7 @@ def main():
     for direction, cfg in DICTS.items():
         if args.direction != "both" and direction != args.direction:
             continue
-
-        print(f"\n── {direction.upper()} ──────────────────────────────────────────",
-              file=sys.stderr)
+        print(f"\n== {direction.upper()} {'='*50}", file=sys.stderr)
         entries = build_direction(
             direction   = direction,
             trans_lang  = cfg["trans_lang"],
@@ -423,10 +386,8 @@ def main():
         chunks = chunk_by_letter(entries)
         write_chunks(chunks, cfg["out"], dry_run=args.dry_run)
 
-    if args.dry_run:
-        print("\n── DRY RUN complete — no files written ──", file=sys.stderr)
-    else:
-        print("\n── Build complete ──", file=sys.stderr)
+    status = "DRY RUN -- no files written" if args.dry_run else "Build complete"
+    print(f"\n== {status} {'='*40}", file=sys.stderr)
 
 
 if __name__ == "__main__":
