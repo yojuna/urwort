@@ -62,16 +62,87 @@ const DIRS = ['de-en', 'en-de'];
 const TOTAL = LETTERS.length * DIRS.length;
 
 // ---------------------------------------------------------------------------
-// Seeding logic
+// Checkpoint management (resume after refresh)
+// Uses IndexedDB since localStorage isn't available in workers
+// ---------------------------------------------------------------------------
+
+const CHECKPOINT_STORE = 'seedCheckpoint';
+
+// Add checkpoint store to Dexie schema
+db.version(5).stores({
+  wordIndex: 'id, word, dir, pos, [word+dir]',
+  wordData:  'id, word, dir, cachedAt',
+  history:   '++id, word, dir, ts, [word+dir]',
+  bookmarks: 'id, word, dir, savedAt, [word+dir]',
+  [CHECKPOINT_STORE]: 'key',  // key = 'chunk-{dir}-{letter}'
+});
+
+function getChunkKey(dir, letter) {
+  return `chunk-${dir}-${letter}`;
+}
+
+async function isChunkSeeded(dir, letter) {
+  try {
+    const key = getChunkKey(dir, letter);
+    const count = await db[CHECKPOINT_STORE].where('key').equals(key).count();
+    return count > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function markChunkSeeded(dir, letter) {
+  try {
+    const key = getChunkKey(dir, letter);
+    await db[CHECKPOINT_STORE].put({ key });
+  } catch (e) {
+    console.warn('[seed] failed to save checkpoint:', e);
+  }
+}
+
+async function getSeededCount() {
+  try {
+    return await db[CHECKPOINT_STORE].count();
+  } catch {
+    return 0;
+  }
+}
+
+async function clearCheckpoint() {
+  try {
+    await db[CHECKPOINT_STORE].clear();
+  } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// Seeding logic (with checkpoint/resume)
 // ---------------------------------------------------------------------------
 
 async function seedAll() {
-  let done = 0;
+  // Check how many chunks are already seeded
+  let done = await getSeededCount();
+
+  // If already fully seeded, skip
+  if (done >= TOTAL) {
+    self.postMessage({ type: 'COMPLETE' });
+    return;
+  }
+
+  const resumed = done > 0;
+  if (resumed) {
+    self.postMessage({ type: 'PROGRESS', done, total: TOTAL, letter: '', dir: '', resumed: true });
+  }
 
   for (const dir of DIRS) {
     for (const letter of LETTERS) {
+      // Skip if already seeded
+      if (await isChunkSeeded(dir, letter)) {
+        continue;
+      }
+
       const url = `/data/${dir}/index/${letter}.json`;
       let entries = [];
+      let success = false;
 
       try {
         const res = await fetch(url);
@@ -79,6 +150,7 @@ async function seedAll() {
           const ct = res.headers.get('content-type') || '';
           if (ct.includes('json')) {
             entries = await res.json();
+            success = true;
           }
         }
       } catch (e) {
@@ -99,17 +171,27 @@ async function seedAll() {
 
         try {
           await db.wordIndex.bulkPut(rows);
+          // Only mark as seeded if bulkPut succeeded
+          await markChunkSeeded(dir, letter);
+          success = true;
         } catch (e) {
           console.error(`[seed] bulkPut error for ${dir}/${letter}:`, e.message);
         }
       }
 
-      done++;
-      self.postMessage({ type: 'PROGRESS', done, total: TOTAL, letter, dir });
+      if (success) {
+        done++;
+      }
+
+      self.postMessage({ type: 'PROGRESS', done, total: TOTAL, letter, dir, resumed });
     }
   }
 
-  self.postMessage({ type: 'COMPLETE' });
+  // Clear checkpoint on complete (cleanup)
+  if (done >= TOTAL) {
+    await clearCheckpoint();
+    self.postMessage({ type: 'COMPLETE' });
+  }
 }
 
 // ---------------------------------------------------------------------------

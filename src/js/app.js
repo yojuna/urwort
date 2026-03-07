@@ -11,10 +11,17 @@
     overlay.hidden = false;
 
     try {
-      await Search.seed(({ done, total, letter, dir }) => {
+      let resumed = false;
+      await Search.seed(({ done, total, letter, dir, resumed: isResumed }) => {
+        if (isResumed && !resumed) {
+          resumed = true;
+          statusEl.textContent = 'Resuming from previous session…';
+        }
         const pct = Math.round((done / total) * 100);
         bar.style.width = pct + '%';
-        statusEl.textContent = `${dir}  /  ${letter}.json  (${done}/${total})`;
+        if (letter && dir) {
+          statusEl.textContent = `${dir}  /  ${letter}.json  (${done}/${total})`;
+        }
       });
     } catch (err) {
       // Seeding failed (e.g. offline on first launch)
