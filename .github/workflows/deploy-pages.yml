@@ -16,6 +16,10 @@ on:
     branches:
       - pages-deploy
 
+# Use Node.js 24 to avoid deprecation warnings
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # Sets permissions of the GITHUB_TOKEN for Pages deployment
 permissions:
   contents: read
@@ -53,7 +57,7 @@ jobs:
           VITE_BASE_PATH: /urwort/
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: game/dist
 
