@@ -10,6 +10,7 @@
 #   ./dev.sh down     # stop container
 #   ./dev.sh logs     # tail container logs
 #   ./dev.sh status   # show container status
+#   ./dev.sh rebuild  # force rebuild container image
 #
 # The container runs Vite (port 5173) and FastAPI (port 8000)
 # automatically. This script just opens a shell for you.
@@ -41,13 +42,26 @@ is_running() {
 }
 
 ensure_running() {
+  local build_flag="${1:---build}"
   if is_running; then
     ok "Container ${BOLD}${CONTAINER}${RESET} is already running"
   else
     info "Starting container..."
-    docker compose up -d --build 2>&1 | sed "s/^/  ${DIM}/"
-    echo -e "${RESET}"
-    ok "Container started"
+    docker compose up -d $build_flag 2>&1 | sed "s/^/  ${DIM}/"
+    echo -ne "${RESET}"
+    # Wait for container to be ready
+    local retries=0
+    while ! is_running && [ $retries -lt 15 ]; do
+      sleep 1
+      retries=$((retries + 1))
+    done
+    if is_running; then
+      ok "Container started"
+    else
+      err "Container failed to start"
+      docker compose logs --tail=20
+      exit 1
+    fi
   fi
 }
 
@@ -87,9 +101,17 @@ case "$cmd" in
       warn "Container is ${YELLOW}not running${RESET}"
     fi
     ;;
+  rebuild)
+    header "Urwort Dev — Rebuild"
+    info "Stopping old container..."
+    docker compose down 2>/dev/null || true
+    info "Rebuilding image..."
+    ensure_running "--build"
+    ok "Rebuilt and started"
+    ;;
   *)
     err "Unknown command: $cmd"
-    echo "Usage: ./dev.sh [shell|up|down|logs|status]"
+    echo "Usage: ./dev.sh [shell|up|down|logs|status|rebuild]"
     exit 1
     ;;
 esac

@@ -13,7 +13,7 @@
 #   ./deploy.sh --skip-export    # skip ontology export (use existing JSON)
 #   ./deploy.sh --dry-run        # build but don't push
 #
-# Requires: the dev container to be running (./dev.sh up)
+# Auto-starts the dev container if not running.
 # ============================================================
 
 set -euo pipefail
@@ -45,6 +45,32 @@ header(){ echo -e "\n${BOLD}${MAGENTA}╔═════════════
 timer_start() { TIMER_START=$(date +%s); }
 timer_end()   { local elapsed=$(( $(date +%s) - TIMER_START )); echo -e "  ${DIM}(${elapsed}s)${RESET}"; }
 
+is_running() {
+  docker ps --filter "name=${CONTAINER}" --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER}$"
+}
+
+ensure_running() {
+  if is_running; then
+    ok "Container ${BOLD}${CONTAINER}${RESET} is running"
+  else
+    info "Container not running — starting it..."
+    docker compose up -d --build 2>&1 | sed "s/^/    ${DIM}/"
+    echo -ne "${RESET}"
+    # Wait for container to be healthy
+    local retries=0
+    while ! is_running && [ $retries -lt 15 ]; do
+      sleep 1
+      retries=$((retries + 1))
+    done
+    if is_running; then
+      ok "Container started"
+    else
+      err "Container failed to start"
+      exit 1
+    fi
+  fi
+}
+
 # ── Parse flags ──────────────────────────────────────────────
 SKIP_EXPORT=false
 DRY_RUN=false
@@ -65,13 +91,8 @@ done
 
 header "Urwort — Build & Deploy"
 
-# ── Pre-flight checks ───────────────────────────────────────
-if ! docker ps --filter "name=${CONTAINER}" --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
-  err "Container ${BOLD}${CONTAINER}${RESET} is not running."
-  info "Start it first: ${BOLD}./dev.sh up${RESET}"
-  exit 1
-fi
-ok "Container ${BOLD}${CONTAINER}${RESET} is running"
+# ── Pre-flight: ensure container is running ──────────────────
+ensure_running
 
 STEP=0
 
@@ -83,7 +104,7 @@ if [ "$SKIP_EXPORT" = false ]; then
 
   docker exec "$CONTAINER" sh -c "cd /workspace && python3 tools/export-ontology.py 2>&1" \
     | while IFS= read -r line; do
-        # Colorise key lines
+        # Colorise key lines from the export script
         if echo "$line" | grep -q '^\[ontology\]'; then
           echo -e "  ${DIM}${line}${RESET}"
         elif echo "$line" | grep -q '^─'; then
@@ -108,6 +129,7 @@ STEP=$((STEP + 1))
 step $STEP "Building game (tsc + vite build)"
 timer_start
 
+BUILD_EXIT=0
 docker exec "$CONTAINER" sh -c "cd /workspace/game && npm run build 2>&1" \
   | while IFS= read -r line; do
       if echo "$line" | grep -q 'error TS'; then
@@ -119,7 +141,12 @@ docker exec "$CONTAINER" sh -c "cd /workspace/game && npm run build 2>&1" \
       else
         echo -e "  ${DIM}${line}${RESET}"
       fi
-    done
+    done || BUILD_EXIT=$?
+
+if [ "$BUILD_EXIT" -ne 0 ]; then
+  err "Build failed with exit code ${BUILD_EXIT}"
+  exit 1
+fi
 
 timer_end
 

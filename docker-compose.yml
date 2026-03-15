@@ -4,9 +4,9 @@
 # Runs the game (Vite) and API (FastAPI) in a single container.
 #
 # Usage:
-#   docker compose up                       # start everything
-#   docker compose exec dev bash            # shell into container
-#   docker compose exec dev npm run build   # build game
+#   ./dev.sh               # start + open interactive shell
+#   ./deploy.sh            # export ontology + build + deploy
+#   docker compose logs -f # tail logs
 # ============================================================
 
 services:
@@ -15,6 +15,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     container_name: urwort-dev
+    user: "node"
     ports:
       - "5173:5173"   # Vite dev server (game)
       - "8000:8000"   # FastAPI (API)
@@ -30,6 +31,7 @@ services:
     environment:
       - NODE_ENV=development
       - URWORT_DB_PATH=/workspace/data/urwort.db
+      - HOME=/home/node
     # Start Vite dev server + FastAPI
     command: >
       bash -c "

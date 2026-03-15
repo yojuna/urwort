@@ -5,8 +5,8 @@
 # in a single container for easy local development.
 #
 # Usage:
-#   docker compose up            # start dev environment
-#   docker compose exec dev bash # open a shell
+#   ./dev.sh             # start + open shell
+#   ./deploy.sh          # export + build + deploy
 # ============================================================
 
 FROM node:22-bookworm-slim
@@ -25,6 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# ---- Reuse the built-in 'node' user (UID 1000) as our dev user ----
+# The node:22 image ships with node:node (1000:1000) which matches typical host UIDs.
+RUN chown -R node:node /opt/venv && \
+    usermod -s /bin/bash node
+
 # Set working directory
 WORKDIR /workspace
 
@@ -35,10 +40,29 @@ RUN pip install --no-cache-dir -r /tmp/api-requirements.txt
 # ---- Node dependencies (Game) ----
 # Copy package files first for layer caching
 COPY game/package.json game/package-lock.json* /tmp/game/
-RUN cd /tmp/game && npm install && mkdir -p /workspace/game && cp -r node_modules /workspace/game/
+RUN cd /tmp/game && npm install && mkdir -p /workspace/game && \
+    cp -r node_modules /workspace/game/ && \
+    chown -R node:node /workspace
+
+# ---- Nice bash prompt + colors for the dev shell ----
+RUN echo '\n\
+# ── Urwort dev shell ─────────────────────────────────────────\n\
+export TERM=xterm-256color\n\
+alias ls="ls --color=auto"\n\
+alias ll="ls -lah --color=auto"\n\
+alias grep="grep --color=auto"\n\
+parse_git_branch() { git branch 2>/dev/null | sed -n "s/* \\(.*\\)/ (\\1)/p"; }\n\
+PS1="\\[\\033[0;36m\\][urwort]\\[\\033[0m\\] \\[\\033[1;34m\\]\\w\\[\\033[0;33m\\]\\$(parse_git_branch)\\[\\033[0m\\] \\$ "\n\
+alias export-ontology="cd /workspace && python3 tools/export-ontology.py"\n\
+alias build="cd /workspace/game && npm run build"\n\
+alias dev="cd /workspace/game && npm run dev"\n\
+' >> /home/node/.bashrc
 
 # Expose ports: Vite dev server + FastAPI
 EXPOSE 5173 8000
+
+# Switch to non-root user
+USER node
 
 # Default command — start Vite dev server
 CMD ["bash", "-c", "cd /workspace/game && npm install && npm run dev"]
