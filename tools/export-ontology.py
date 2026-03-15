@@ -862,9 +862,10 @@ def populate_graph_tables(db_path: str, clusters: list[dict]) -> dict:
     }
 
     # Clear previous graph data (idempotent rebuild)
+    # NOTE: spatial_layout is NOT cleared here — it's populated by compute-layout.py
     for table in ["entry_fields", "semantic_fields", "semantic_edges",
                    "compound_edges", "derivation_edges", "decompositions",
-                   "etymology_edges", "affixes", "roots", "spatial_layout"]:
+                   "etymology_edges", "affixes", "roots"]:
         cur.execute(f"DELETE FROM {table}")
 
     seen_roots: set[str] = set()
@@ -1083,6 +1084,39 @@ def populate_graph_tables(db_path: str, clusters: list[dict]) -> dict:
     return stats
 
 
+def attach_positions(clusters: list[dict], db_path: str) -> int:
+    """
+    Read pre-computed positions from spatial_layout table and attach
+    to cluster data as cluster["position"] = {"x": ..., "z": ..., "height": ...}.
+
+    Returns the number of clusters that received positions.
+    """
+    conn = sqlite3.connect(db_path)
+    positions = {}
+    for row in conn.execute(
+        "SELECT root_id, x, z, island_height FROM spatial_layout"
+    ):
+        positions[row[0]] = {"x": row[1], "z": row[2], "height": row[3]}
+    conn.close()
+
+    attached = 0
+    for cluster in clusters:
+        wid = cluster["wurzel"]["id"]
+        if wid in positions:
+            cluster["position"] = positions[wid]
+            attached += 1
+        # else: no position data — cluster will use fallback grid in the client
+
+    if attached:
+        print(f"[ontology] Attached positions to {attached} / {len(clusters)} clusters "
+              f"(from spatial_layout table)")
+    else:
+        print(f"[ontology] No positions in spatial_layout table "
+              f"(run compute-layout.py first for embedding-based layout)")
+
+    return attached
+
+
 def print_graph_stats(db_path: str) -> None:
     """Print row counts for all graph tables."""
     conn = sqlite3.connect(db_path)
@@ -1159,6 +1193,9 @@ def main() -> None:
         print(f"  {table}: {count:,}")
     print_graph_stats(str(db_path))
 
+    # Attach pre-computed positions from spatial_layout (Phase 1A)
+    positioned_count = attach_positions(clusters, str(db_path))
+
     # Apply minimum cluster size filter
     if args.min_cluster_size > 1:
         before = len(clusters)
@@ -1169,7 +1206,7 @@ def main() -> None:
     multi_word = [c for c in clusters if len(c["words"]) >= 2]
 
     output = {
-        "version": 2,
+        "version": 3,
         "stats": {
             "total_clusters":              len(clusters),
             "multi_word_clusters":         len(multi_word),
@@ -1182,9 +1219,21 @@ def main() -> None:
             "words_with_segments": sum(
                 1 for c in clusters for w in c["words"] if w.get("segments")
             ),
+            "clusters_with_position": sum(
+                1 for c in clusters if "position" in c
+            ),
         },
         "clusters": clusters,
     }
+
+    # Add layout metadata if we have positions
+    if positioned_count > 0:
+        output["layout"] = {
+            "algorithm": "umap_force_directed",
+            "embedding_model": "fasttext_cc_de_300",
+            "world_size": 400,
+            "height_range": 12,
+        }
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:

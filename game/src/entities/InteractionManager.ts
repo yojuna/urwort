@@ -182,7 +182,7 @@ export class InteractionManager {
           const island = this.islandMap.get(islandId);
           if (island) {
             this.cameraCtrl.focusOn(
-              new THREE.Vector3(island.position.x, 0, island.position.z),
+              new THREE.Vector3(island.position.x, island.position.y, island.position.z),
             );
             this.wordCard.showIsland(
               island.cluster.wurzel,

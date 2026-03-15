@@ -28,9 +28,9 @@ import type { KeyboardState } from './input';
 // --- Tuning constants ---
 const MOVE_SPEED = 25;          // WASD units per second
 const DAMPING_FACTOR = 0.08;    // lower = more inertia
-const MIN_DISTANCE = 8;         // closest zoom
-const MAX_DISTANCE = 100;       // farthest zoom
-const MIN_POLAR_ANGLE = 0.2;    // nearly top-down
+const MIN_DISTANCE = 10;        // closest zoom (slightly further to avoid terrain clipping)
+const MAX_DISTANCE = 150;       // farthest zoom (need to pull back for terrain overview)
+const MIN_POLAR_ANGLE = 0.15;   // nearly top-down (good for map view)
 const MAX_POLAR_ANGLE = 1.45;   // nearly horizon (radians from +Y)
 const PAN_SPEED = 1.5;          // touch/mouse pan sensitivity
 const ROTATE_SPEED = 0.5;       // orbit sensitivity

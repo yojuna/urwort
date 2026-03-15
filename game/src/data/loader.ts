@@ -28,6 +28,7 @@ interface RawCluster {
   words: Wort[];
   links: WurzelWortLink[];
   compounds: CompoundLink[];
+  position?: { x: number; z: number; height: number };
 }
 
 /** Options for loading and filtering the ontology */

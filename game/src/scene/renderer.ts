@@ -1,6 +1,6 @@
 /**
  * Three.js scene, camera, and renderer setup.
- * Phase 0: Simple perspective camera with orbit-like controls.
+ * Phase 1B: terrain-aware fog, lighting, and shadow volumes.
  */
 import * as THREE from 'three';
 
@@ -15,16 +15,18 @@ export function createSceneContext(container: HTMLElement): SceneContext {
   // Scene
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87CEEB); // Sky blue
-  scene.fog = new THREE.Fog(0x87CEEB, 80, 200);
 
-  // Camera
+  // Fog: increased far distance to reveal more terrain landscape
+  scene.fog = new THREE.Fog(0x87CEEB, 80, 280);
+
+  // Camera — higher initial position to see terrain relief
   const camera = new THREE.PerspectiveCamera(
     60,
     container.clientWidth / container.clientHeight,
     0.1,
-    500
+    600,
   );
-  camera.position.set(0, 30, 40);
+  camera.position.set(0, 50, 100);
   camera.lookAt(0, 0, 0);
 
   // Renderer
@@ -42,31 +44,22 @@ export function createSceneContext(container: HTMLElement): SceneContext {
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambientLight);
 
+  // Directional light — positioned higher to illuminate terrain slopes
   const directionalLight = new THREE.DirectionalLight(0xfff4e6, 0.8);
-  directionalLight.position.set(20, 40, 20);
+  directionalLight.position.set(50, 80, 30);
   directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.width = 1024;
-  directionalLight.shadow.mapSize.height = 1024;
+
+  // Shadow camera encompasses the 400×400 world
+  directionalLight.shadow.mapSize.setScalar(2048);
   directionalLight.shadow.camera.near = 0.5;
-  directionalLight.shadow.camera.far = 150;
-  directionalLight.shadow.camera.left = -60;
-  directionalLight.shadow.camera.right = 60;
-  directionalLight.shadow.camera.top = 60;
-  directionalLight.shadow.camera.bottom = -60;
+  directionalLight.shadow.camera.far = 300;
+  directionalLight.shadow.camera.left = -200;
+  directionalLight.shadow.camera.right = 200;
+  directionalLight.shadow.camera.top = 200;
+  directionalLight.shadow.camera.bottom = -200;
   scene.add(directionalLight);
 
-  // Ground plane (water/ocean)
-  const groundGeo = new THREE.PlaneGeometry(500, 500);
-  const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x3A7CA5,
-    roughness: 0.8,
-    metalness: 0.1,
-  });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -0.5;
-  ground.receiveShadow = true;
-  scene.add(ground);
+  // Ground plane removed — replaced by terrain mesh in main.ts (Phase 1B)
 
   // Clock
   const clock = new THREE.Clock();

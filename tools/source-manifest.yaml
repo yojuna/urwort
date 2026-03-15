@@ -46,8 +46,25 @@ sources:
     license: CC BY 4.0
     provides: A1/A2/B1/B2/C1/C2 level tags
 
+  fasttext_cc_de_300:
+    name: fastText German Word Vectors (Common Crawl + Wikipedia)
+    url: https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.de.300.vec.gz
+    files:
+      - raw-data/fasttext/cc.de.300.vec
+    format: word2vec text format (word + 300-dim vector per line)
+    dimensions: 300
+    vocabulary: "~2M words"
+    compressed_size: "~1.2GB"
+    uncompressed_size: "~4.5GB"
+    license: CC-BY-SA-3.0
+    citation: "Grave et al., Learning Word Vectors for 157 Languages, LREC 2018"
+    provides: >
+      word embeddings for spatial layout computation (Phase 1A).
+      Used by tools/compute-layout.py to compute UMAP cluster positions.
+
 build:
   tool: tools/build-db.py
   output: data/urwort.db
   export: tools/export-ontology.py
+  layout: tools/compute-layout.py
   schema: tools/schema.sql

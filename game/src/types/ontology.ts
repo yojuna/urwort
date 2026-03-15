@@ -99,4 +99,6 @@ export interface RootCluster {
   words: Wort[];
   links: WurzelWortLink[];
   compounds: CompoundLink[];
+  /** Pre-computed embedding-based position from Phase 1A layout pipeline */
+  position?: { x: number; z: number; height: number };
 }

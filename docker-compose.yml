@@ -1,7 +1,8 @@
 # ============================================================
-# Urwort — Phase 0 Development Environment
+# Urwort — Development Environment (GPU-enabled)
 # ============================================================
-# Runs the game (Vite) and API (FastAPI) in a single container.
+# Runs the game (Vite) and API (FastAPI) in a single container
+# with NVIDIA GPU passthrough for compute-layout.py.
 #
 # Usage:
 #   ./dev.sh               # start + open interactive shell
@@ -32,6 +33,16 @@ services:
       - NODE_ENV=development
       - URWORT_DB_PATH=/workspace/data/urwort.db
       - HOME=/home/node
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    # GPU passthrough
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     # Start Vite dev server + FastAPI
     command: >
       bash -c "

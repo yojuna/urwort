@@ -6,9 +6,10 @@ import * as THREE from 'three';
 import { createSceneContext } from '@/scene/renderer';
 import { CameraController } from '@/player/camera';
 import { createKeyboardState, bindKeyboard } from '@/player/input';
-import { computeGridLayout } from '@/world/layout';
+import { computeLayout } from '@/world/layout';
 import { createIslandMesh } from '@/world/island';
 import { createBridgeMesh } from '@/world/bridge';
+import { createTerrain, createWaterPlane } from '@/world/terrain';
 import { loadOntology } from '@/data/loader';
 import { OntologyStore } from '@/data/OntologyStore';
 import { MOCK_CLUSTERS } from '@/data/mock';
@@ -47,8 +48,14 @@ async function main(): Promise<void> {
 
   // --- Build world ---
   if (loadingText) loadingText.textContent = 'Building world...';
-  const layout = computeGridLayout(clusters);
+  const layout = computeLayout(clusters);
   const islandMap = new Map<string, Island>();
+
+  // Terrain + water (Phase 1B)
+  const terrain = createTerrain(layout.islands, 400, 200);
+  const water = createWaterPlane(400);
+  ctx.scene.add(terrain);
+  ctx.scene.add(water);
 
   for (const island of layout.islands) {
     islandMap.set(island.id, island);
@@ -72,7 +79,7 @@ async function main(): Promise<void> {
   // --- Wire UI: search + 3D interaction ---
   new SearchBar(container, store, ({ wort, cluster }) => {
     const island = [...islandMap.values()].find(i => i.cluster.words.some(w => w.id === wort.id));
-    if (island) cameraCtrl.focusOn(new THREE.Vector3(island.position.x, 0, island.position.z));
+    if (island) cameraCtrl.focusOn(new THREE.Vector3(island.position.x, island.position.y, island.position.z));
     const compound = cluster.compounds.find(c => c.compound_wort_id === wort.id);
     wordCard.showWord(wort, cluster.wurzel, compound);
   });

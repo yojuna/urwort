@@ -1,37 +1,52 @@
 /**
- * World layout computation for Phase 0.
- * Simple grid layout for now — force-directed to be explored later
- * once we have visuals and can evaluate spatial quality.
+ * World layout computation.
+ *
+ * Phase 1B: reads pre-computed embedding-based positions from ontology.json.
+ * Falls back to a deterministic grid for clusters without position data.
  */
-import type { RootCluster, Island, Bridge, WorldLayout, CompoundLink } from '@/types';
+import type { RootCluster, Island, Bridge, WorldLayout } from '@/types';
 
-const GRID_SPACING = 25;  // distance between island centres
+const GRID_SPACING = 25; // distance between island centres (fallback grid)
 
 /**
- * Arrange root clusters in a grid layout.
- * Phase 0: deterministic placement. Force-directed layout is Phase 0.5+.
+ * Arrange root clusters using embedding positions when available,
+ * falling back to a grid layout for clusters without position data.
  */
-export function computeGridLayout(clusters: RootCluster[]): WorldLayout {
-  const cols = Math.ceil(Math.sqrt(clusters.length));
+export function computeLayout(clusters: RootCluster[]): WorldLayout {
+  const islands: Island[] = [];
 
-  const islands: Island[] = clusters.map((cluster, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
+  // Fallback grid parameters (used when position data is missing)
+  let fallbackIndex = 0;
+  const fallbackCols = Math.ceil(Math.sqrt(clusters.length));
 
+  for (const cluster of clusters) {
     // Island radius proportional to word count (min 3, max 8)
     const radius = Math.min(8, Math.max(3, cluster.words.length * 0.8 + 2));
 
-    return {
+    let x: number, z: number, height: number;
+
+    if (cluster.position) {
+      // Use pre-computed embedding-based position (Phase 1A)
+      x = cluster.position.x;
+      z = cluster.position.z;
+      height = cluster.position.height;
+    } else {
+      // Fallback: grid layout for clusters without position data
+      const col = fallbackIndex % fallbackCols;
+      const row = Math.floor(fallbackIndex / fallbackCols);
+      x = (col - fallbackCols / 2) * GRID_SPACING;
+      z = (row - fallbackCols / 2) * GRID_SPACING;
+      height = 0;
+      fallbackIndex++;
+    }
+
+    islands.push({
       id: cluster.wurzel.id,
       cluster,
-      position: {
-        x: (col - cols / 2) * GRID_SPACING,
-        y: 0,
-        z: (row - cols / 2) * GRID_SPACING,
-      },
+      position: { x, y: height, z },
       radius,
-    };
-  });
+    });
+  }
 
   // Build bridges from compound links
   const bridges: Bridge[] = [];
