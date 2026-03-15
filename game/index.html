@@ -26,6 +26,12 @@
       position: relative;
     }
 
+    /* Prevent browser-level gestures so Three.js gets all touch events */
+    canvas {
+      touch-action: none;
+      display: block;
+    }
+
     /* Loading screen */
     #loading {
       position: absolute;

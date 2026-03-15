@@ -24,26 +24,3 @@ export interface WorldLayout {
   islands: Island[];
   bridges: Bridge[];
 }
-
-/** Camera state */
-export interface CameraState {
-  position: { x: number; y: number; z: number };
-  target: { x: number; y: number; z: number };
-  zoom: number;
-}
-
-/** Player input state */
-export interface InputState {
-  /** Movement keys held: WASD / arrow keys */
-  moveForward: boolean;
-  moveBackward: boolean;
-  moveLeft: boolean;
-  moveRight: boolean;
-  /** Mouse drag state for orbit */
-  isDragging: boolean;
-  /** Pointer position (normalised -1..1) */
-  pointerX: number;
-  pointerY: number;
-  /** Scroll delta for zoom */
-  zoomDelta: number;
-}
