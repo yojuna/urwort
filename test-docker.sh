@@ -14,19 +14,21 @@ NC='\033[0m' # No Color
 
 # Test 1: Check if containers are running
 echo "1. Checking if containers are running..."
-if docker compose ps | grep -q "urwort-api.*Up"; then
+COMPOSE="docker compose -f infra/docker/docker-compose.dev.yml"
+
+if $COMPOSE ps | grep -q "urwort-api.*Up"; then
     echo -e "${GREEN}✓ API container is running${NC}"
 else
     echo -e "${RED}✗ API container is not running${NC}"
-    echo "   Run: docker compose up"
+    echo "   Run: docker compose -f infra/docker/docker-compose.dev.yml up"
     exit 1
 fi
 
-if docker compose ps | grep -q "urwort-dev.*Up"; then
+if $COMPOSE ps | grep -q "urwort-web.*Up"; then
     echo -e "${GREEN}✓ Nginx container is running${NC}"
 else
     echo -e "${RED}✗ Nginx container is not running${NC}"
-    echo "   Run: docker compose up"
+    echo "   Run: docker compose -f infra/docker/docker-compose.dev.yml up"
     exit 1
 fi
 echo ""
@@ -38,7 +40,7 @@ if curl -s http://localhost:8000/api/health | grep -q "healthy"; then
     curl -s http://localhost:8000/api/health | python3 -m json.tool 2>/dev/null || echo "   (JSON parsing failed, but endpoint responded)"
 else
     echo -e "${RED}✗ API health check failed${NC}"
-    echo "   Check: docker compose logs urwort-api"
+    echo "   Check: docker compose -f infra/docker/docker-compose.dev.yml logs urwort-api"
 fi
 echo ""
 
@@ -49,7 +51,7 @@ if curl -s http://localhost:8080/api/health | grep -q "healthy"; then
     curl -s http://localhost:8080/api/health | python3 -m json.tool 2>/dev/null || echo "   (JSON parsing failed, but endpoint responded)"
 else
     echo -e "${RED}✗ API proxy failed${NC}"
-    echo "   Check: docker compose logs urwort-dev"
+    echo "   Check: docker compose -f infra/docker/docker-compose.dev.yml logs urwort-web"
 fi
 echo ""
 

@@ -29,9 +29,10 @@ A progressive web app (PWA) for German-English dictionary lookup, built with van
 
 ### Infrastructure
 - **Docker Compose** — Two services:
-  - `urwort-dev` (nginx) — Serves PWA static files
+  - `urwort-web` (nginx) — Serves PWA static files + proxies `/api/*`
   - `urwort-api` (FastAPI) — Enrichment API
-- **Nginx proxy** — Routes `/api/*` to FastAPI backend
+- **Hetzner Cloud** — CX22 server + persistent volume for SQLite DB
+- **Terraform + Ansible** — Provisioning and deployment via `infra/`
 
 ## Quick Start
 
@@ -46,12 +47,15 @@ A progressive web app (PWA) for German-English dictionary lookup, built with van
 git clone <repo-url>
 cd urwort
 
+# (First time) Build the SQLite database from raw-data/
+docker compose -f infra/docker/docker-compose.dev.yml run --rm urwort-build
+
 # Start all services
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f infra/docker/docker-compose.dev.yml up --build
 
 # Access the app
 # Frontend: http://localhost:8080
-# API: http://localhost:8000
+# API:      http://localhost:8000
 ```
 
 ### Testing
@@ -60,10 +64,10 @@ docker compose -f docker-compose.dev.yml up --build
 # Test API directly
 curl http://localhost:8000/api/kaikki/Haus
 
-# Test API via nginx
+# Test API via nginx proxy
 curl http://localhost:8080/api/kaikki/Haus
 
-# Run automated tests
+# Run automated tests (from project root)
 ./test-docker.sh
 ```
 
@@ -71,27 +75,45 @@ curl http://localhost:8080/api/kaikki/Haus
 
 ```
 urwort/
-├── api/                    # FastAPI backend
-│   ├── main.py            # FastAPI app
-│   ├── kaikki.py          # kaikki.org fetching
-│   ├── cache.py            # Caching logic
-│   ├── models.py          # Pydantic models
+├── api/                        # FastAPI backend
+│   ├── main.py                # Routes
+│   ├── db.py                  # SQLite connection helper
+│   ├── dwds.py                # DWDS fetching/parsing
+│   ├── enrichment.py          # Entry enrichment logic
+│   ├── models.py              # Pydantic models
 │   └── requirements.txt
-├── src/                    # PWA frontend
+├── src/                        # PWA frontend
 │   ├── js/
-│   │   ├── app.js         # Main app logic
-│   │   ├── search.js     # Search functionality
-│   │   ├── kaikki.js     # API integration
-│   │   ├── db.js         # IndexedDB (Dexie)
-│   │   └── ui.js         # UI rendering
+│   │   ├── app.js             # Main app logic
+│   │   ├── search.js          # Search functionality
+│   │   ├── db.js              # IndexedDB (Dexie)
+│   │   ├── dwds.js            # DWDS enrichment layer
+│   │   └── ui.js              # UI rendering
 │   ├── css/
-│   ├── data/              # Dictionary data chunks
 │   └── index.html
-├── tools/                  # Build scripts
-│   └── build-dict.py      # Dictionary builder
-├── docs/                   # Documentation
-├── docker-compose.yml      # Docker setup
-└── nginx.dev.conf         # Nginx configuration
+├── tools/                      # Build scripts
+│   ├── build-db.py            # SQLite DB builder (multi-source)
+│   └── schema.sql             # Canonical DB schema
+├── data/                       # Generated SQLite DB (gitignored)
+├── raw-data/                   # Source data files (gitignored)
+├── docs/                       # Documentation
+└── infra/                      # Infrastructure & deployment
+    ├── docker/                 # Dockerfiles, nginx configs, compose files
+    │   ├── Dockerfile.web      # Dev nginx image
+    │   ├── Dockerfile.web.prod # Prod nginx image (src/ baked in)
+    │   ├── Dockerfile.api      # FastAPI image
+    │   ├── Dockerfile.build    # DB builder image
+    │   ├── nginx.dev.conf      # Dev nginx config
+    │   ├── nginx.prod.conf     # Prod nginx config
+    │   ├── docker-compose.dev.yml
+    │   └── docker-compose.prod.yml
+    ├── terraform/              # Hetzner Cloud provisioning
+    ├── ansible/                # Server configuration & deployment
+    ├── scripts/                # deploy.sh, deploy-frontend.sh
+    ├── deploy-keys/            # SSH deploy key (urwort_ed25519)
+    ├── Dockerfile.ops          # Ops toolbox image
+    ├── docker-compose.ops.yml  # Launch ops container
+    └── deploy.conf             # Server IP (read by CI)
 ```
 
 ## API Endpoints
@@ -157,14 +179,16 @@ LOG_LEVEL=INFO
 
 ### Viewing Logs
 ```bash
+COMPOSE="docker compose -f infra/docker/docker-compose.dev.yml"
+
 # All services
-docker compose logs -f
+$COMPOSE logs -f
 
 # Just API
-docker compose logs -f urwort-api
+$COMPOSE logs -f urwort-api
 
 # Just nginx
-docker compose logs -f urwort-dev
+$COMPOSE logs -f urwort-web
 ```
 
 ## Data Flow

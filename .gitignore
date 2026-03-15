@@ -88,7 +88,8 @@ src/data/en-de/index/x.json
 src/data/en-de/index/y.json
 src/data/en-de/index/z.json
 
-# Built SQLite database — regenerate with: docker compose run --rm urwort-build
+# Built SQLite database — regenerate with:
+#   docker compose -f infra/docker/docker-compose.dev.yml run --rm urwort-build
 data/urwort.db
 data/urwort.db-wal
 data/urwort.db-shm
@@ -96,3 +97,11 @@ data/urwort.db-shm
 # Pipeline misc
 tools/output/
 tools/*.log
+
+# Infra secrets — never commit
+infra/.env.ops
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.backup
+infra/terraform/.terraform.lock.hcl
+infra/ansible/inventory.yml

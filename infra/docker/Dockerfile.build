@@ -1,13 +1,11 @@
-# Dockerfile.build
+# infra/docker/Dockerfile.build
 # One-shot container that builds data/urwort.db from raw-data/
+# Build context is project root (../../ relative to this file).
 #
 # Usage:
-#   docker compose run --rm urwort-build
-#   docker compose run --rm urwort-build python tools/build-db.py --limit 5000
-#
-# Mounts (provided by docker-compose):
-#   raw-data/ → /app/raw-data  (read-only)
-#   data/     → /app/data      (read-write, outputs urwort.db)
+#   docker compose -f infra/docker/docker-compose.dev.yml run --rm urwort-build
+#   docker compose -f infra/docker/docker-compose.dev.yml run --rm urwort-build \
+#     python tools/build-db.py --limit 5000
 
 FROM python:3.11-slim
 

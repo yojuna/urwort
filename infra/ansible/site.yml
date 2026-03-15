@@ -1,0 +1,289 @@
+# ============================================================
+# urwort Server Setup — Ansible Playbook
+#
+# Full setup (first time, from inside ops container):
+#   cd /ops/ansible
+#   ansible-playbook -i inventory.yml site.yml
+#
+# Code-only redeploy (sync + rebuild + restart, no system changes):
+#   ansible-playbook -i inventory.yml site.yml --tags=deploy
+#
+# Or let deploy.sh pass all vars automatically.
+# ============================================================
+
+- name: Configure and deploy urwort server
+  hosts: all
+  become: true
+
+  vars:
+    app_dir:      "/opt/urwort"
+    data_dir:     "{{ volume_mount }}"          # /mnt/urwort-data
+    compose_file: "{{ app_dir }}/infra/docker/docker-compose.prod.yml"
+
+    # ── Defaults (overridden by deploy.sh --extra-vars) ───────────────────
+    # No secrets required for urwort beyond what's in the .env on the server.
+    # S3 / RunPod / LLM keys are not used — see ansible/templates/env.prod.j2.
+
+  tasks:
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 1 — System baseline
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - jq
+          - unzip
+          - htop
+          - rsync
+          - ufw
+          - fail2ban
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    # ── Swap (helps small servers during docker build) ──
+    - name: Check if swap exists
+      stat:
+        path: /swapfile
+      register: swap_check
+
+    - name: Create 2 GB swap
+      shell: |
+        fallocate -l 2G /swapfile
+        chmod 600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      when: not swap_check.stat.exists
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 2 — Firewall
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: UFW — set defaults and allow SSH / HTTP / HTTPS
+      ansible.builtin.shell: |
+        ufw --force reset
+        ufw default deny incoming
+        ufw default allow outgoing
+        ufw allow 22/tcp
+        ufw allow 80/tcp
+        ufw allow 443/tcp
+        ufw --force enable
+      args:
+        executable: /bin/bash
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 3 — SSH hardening
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Disable SSH password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PasswordAuthentication"
+        line: "PasswordAuthentication no"
+      notify: Restart SSH
+
+    - name: Restrict root login to key-only
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PermitRootLogin"
+        line: "PermitRootLogin prohibit-password"
+      notify: Restart SSH
+
+    - name: Enable and start fail2ban
+      systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 4 — Docker
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Add Docker GPG key
+      shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+          -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+      args:
+        creates: /etc/apt/keyrings/docker.asc
+
+    - name: Add Docker apt repository
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) \
+        signed-by=/etc/apt/keyrings/docker.asc] \
+        https://download.docker.com/linux/ubuntu \
+        $(lsb_release -cs) stable" \
+        > /etc/apt/sources.list.d/docker.list
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Install Docker CE + compose plugin
+      apt:
+        update_cache: true
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 5 — Directory structure on volume
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Ensure volume mount point exists
+      file:
+        path: "{{ data_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create data subdirectories on volume
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ data_dir }}/db"           # SQLite database (urwort.db)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 6 — Sync app files to server                     [tag: deploy]
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+      tags: [deploy]
+
+    # /ops/app is the project root mounted read-only in docker-compose.ops.yml
+    - name: Sync frontend source (src/)
+      synchronize:
+        src: "/ops/app/src/"
+        dest: "{{ app_dir }}/src/"
+        delete: true
+        rsync_opts:
+          - "--exclude=.DS_Store"
+      tags: [deploy]
+
+    - name: Sync API source (api/)
+      synchronize:
+        src: "/ops/app/api/"
+        dest: "{{ app_dir }}/api/"
+        delete: true
+        rsync_opts:
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+      tags: [deploy]
+
+    - name: Sync build tools (tools/)
+      synchronize:
+        src: "/ops/app/tools/"
+        dest: "{{ app_dir }}/tools/"
+        delete: true
+        rsync_opts:
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+      tags: [deploy]
+
+    - name: Sync Docker configs (infra/docker/)
+      synchronize:
+        src: "/ops/app/infra/docker/"
+        dest: "{{ app_dir }}/infra/docker/"
+        delete: true
+      tags: [deploy]
+
+    - name: Copy .dockerignore
+      copy:
+        src: "/ops/app/.dockerignore"
+        dest: "{{ app_dir }}/.dockerignore"
+      tags: [deploy]
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 7 — Write .env from template                     [tag: deploy]
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Template .env with production settings
+      template:
+        src: templates/env.prod.j2
+        dest: "{{ app_dir }}/.env"
+        mode: "0600"   # secrets — owner-read only
+      tags: [deploy]
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 8 — Build and start Docker stack                 [tag: deploy]
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Build API and web images on server
+      command: >
+        docker compose -f {{ compose_file }} build api web
+      args:
+        chdir: "{{ app_dir }}"
+      register: build_output
+      changed_when: true
+      tags: [deploy]
+
+    - name: Start / update all services
+      command: >
+        docker compose -f {{ compose_file }} --env-file {{ app_dir }}/.env up -d --remove-orphans
+      args:
+        chdir: "{{ app_dir }}"
+      register: up_output
+      tags: [deploy]
+
+    - name: Show compose output
+      debug:
+        msg: "{{ up_output.stdout_lines }}"
+      tags: [deploy]
+
+    # ──────────────────────────────────────────────────────────────────────
+    # PHASE 9 — Verify                                       [tag: deploy]
+    # ──────────────────────────────────────────────────────────────────────
+
+    - name: Wait for API to be healthy
+      uri:
+        url: "http://localhost:8000/api/health"
+        status_code: 200
+      register: health_result
+      until: health_result.status == 200
+      retries: 15
+      delay: 5
+      tags: [deploy]
+
+    - name: Deployment summary
+      debug:
+        msg: |
+          ✅ urwort deployed successfully!
+          ─────────────────────────────────────────
+          App:            http://{{ server_ip | replace('.', '-') }}.sslip.io
+          API health:     http://{{ server_ip | replace('.', '-') }}.sslip.io/api/health
+          API (internal): http://localhost:8000  (for debugging on server)
+          ─────────────────────────────────────────
+          Data volume:    {{ data_dir }}
+          App dir:        {{ app_dir }}
+      tags: [deploy]
+
+  handlers:
+    - name: Restart SSH
+      systemd:
+        name: sshd
+        state: restarted

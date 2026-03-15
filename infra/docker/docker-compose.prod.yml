@@ -1,0 +1,57 @@
+# infra/docker/docker-compose.prod.yml
+# Production stack — src/ baked into web image, no volume mounts,
+# ready for deployment on the Hetzner server.
+#
+# Build & start:
+#   docker compose -f infra/docker/docker-compose.prod.yml --env-file .env up --build -d
+#
+# Rebuild a single service:
+#   docker compose -f infra/docker/docker-compose.prod.yml build api
+
+services:
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  urwort-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    image: urwort-api:latest
+    container_name: urwort-api
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DB_PATH=/app/data/urwort.db
+      - LOG_LEVEL=INFO
+      - DWDS_RATE_LIMIT=30
+    volumes:
+      # SQLite DB lives on the persistent Hetzner volume
+      - ${DATA_DIR:-/mnt/urwort-data}/db:/app/data:rw
+    restart: unless-stopped
+    networks:
+      - urwort-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Nginx frontend (static PWA + API proxy) ────────────────────────────────
+  urwort-web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web.prod
+    image: urwort-web:latest
+    container_name: urwort-web
+    ports:
+      - "0.0.0.0:80:8080"
+    depends_on:
+      urwort-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - urwort-network
+
+networks:
+  urwort-network:
+    driver: bridge

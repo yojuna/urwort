@@ -1,0 +1,78 @@
+# infra/docker/docker-compose.dev.yml
+# Development stack — all services with live-reload, volume mounts, and the
+# DB-builder as an optional one-shot service.
+#
+# First-time setup (build the SQLite database):
+#   docker compose -f infra/docker/docker-compose.dev.yml run --rm urwort-build
+#   docker compose -f infra/docker/docker-compose.dev.yml run --rm urwort-build \
+#     python tools/build-db.py --limit 5000
+#
+# Daily development:
+#   docker compose -f infra/docker/docker-compose.dev.yml up
+
+services:
+
+  # ── DB builder (one-shot) ──────────────────────────────────────────────────
+  urwort-build:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.build
+    image: urwort-build:dev
+    container_name: urwort-build
+    volumes:
+      - ../../raw-data:/app/raw-data:ro
+      - ../../data:/app/data:rw
+      - ../../tools:/app/tools:ro
+    profiles:
+      - build
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  urwort-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    image: urwort-api:dev
+    container_name: urwort-api
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - ../../api:/app/api:rw
+      - ../../data:/app/data:rw
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DB_PATH=/app/data/urwort.db
+      - LOG_LEVEL=DEBUG
+      - DWDS_RATE_LIMIT=30
+    restart: unless-stopped
+    networks:
+      - urwort-network
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── Nginx frontend ─────────────────────────────────────────────────────────
+  urwort-web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    image: urwort-web:dev
+    container_name: urwort-web
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      - ../../src:/usr/share/nginx/html:ro
+    depends_on:
+      urwort-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - urwort-network
+
+networks:
+  urwort-network:
+    driver: bridge

@@ -1,0 +1,43 @@
+# ============================================================
+# urwort Ops Toolbox — launch with:
+#   docker compose -f infra/docker-compose.ops.yml run --rm ops
+# ============================================================
+
+services:
+  ops:
+    build:
+      context: .
+      dockerfile: Dockerfile.ops
+    image: urwort-ops:latest
+    container_name: urwort-ops
+    stdin_open: true
+    tty: true
+    volumes:
+      # Infra configs mounted into the container
+      - ./terraform:/ops/terraform
+      - ./ansible:/ops/ansible
+      - ./scripts:/ops/scripts
+
+      # Whole project root mounted read-only — needed by Ansible synchronize
+      # tasks to rsync src/, api/, infra/docker/ to the server
+      - ..:/ops/app:ro
+
+      # Mount ONLY the urwort deploy key — not the whole ~/.ssh directory.
+      # The entrypoint copies these into /root/.ssh with correct root
+      # ownership and permissions on every container start.
+      - ~/.ssh/urwort_ed25519:/ssh-keys/urwort_ed25519:ro
+      - ~/.ssh/urwort_ed25519.pub:/ssh-keys/urwort_ed25519.pub:ro
+
+      # Cache Terraform plugins across runs
+      - tf-plugins:/root/.terraform.d/plugin-cache
+
+    # All credentials loaded from .env.ops
+    env_file:
+      - .env.ops
+    environment:
+      - TF_PLUGIN_CACHE_DIR=/root/.terraform.d/plugin-cache
+    working_dir: /ops
+
+volumes:
+  tf-plugins:
+    driver: local
