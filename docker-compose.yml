@@ -1,0 +1,42 @@
+# ============================================================
+# Urwort — Phase 0 Development Environment
+# ============================================================
+# Runs the game (Vite) and API (FastAPI) in a single container.
+#
+# Usage:
+#   docker compose up                       # start everything
+#   docker compose exec dev bash            # shell into container
+#   docker compose exec dev npm run build   # build game
+# ============================================================
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: urwort-dev
+    ports:
+      - "5173:5173"   # Vite dev server (game)
+      - "8000:8000"   # FastAPI (API)
+    volumes:
+      # Mount source code for live editing (HMR)
+      - ./game:/workspace/game
+      - ./api:/workspace/api
+      - ./tools:/workspace/tools
+      - ./data:/workspace/data
+      # Persist node_modules inside container (avoid host/container mismatch)
+      - urwort_node_modules:/workspace/game/node_modules
+    environment:
+      - NODE_ENV=development
+      - URWORT_DB_PATH=/workspace/data/urwort.db
+    # Start Vite dev server by default
+    command: >
+      bash -c "
+        cd /workspace/game && npm install &&
+        npm run dev &
+        cd /workspace/api && uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+        wait
+      "
+
+volumes:
+  urwort_node_modules:

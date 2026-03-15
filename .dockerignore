@@ -1,0 +1,8 @@
+.git
+raw-data
+docs
+game/node_modules
+game/dist
+data/*.db
+__pycache__
+*.pyc
