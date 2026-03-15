@@ -12,6 +12,7 @@ import { createBridgeMesh } from '@/world/bridge';
 import { loadOntology } from '@/data/loader';
 import { MOCK_CLUSTERS } from '@/data/mock';
 import { WordCard } from '@/ui/word-card';
+import { SearchBar } from '@/ui/search-bar';
 import type { Island, RootCluster } from '@/types';
 
 async function main(): Promise<void> {
@@ -69,6 +70,22 @@ async function main(): Promise<void> {
     const mesh = createBridgeMesh(bridge, islandMap);
     if (mesh) ctx.scene.add(mesh);
   }
+
+  // --- Search bar (needs islandMap to fly-to on select) ---
+  const searchBar = new SearchBar(container, ({ wort, cluster }) => {
+    const island = [...islandMap.values()].find(
+      i => i.cluster.words.some(w => w.id === wort.id),
+    );
+    if (island) {
+      cameraCtrl.focusOn(
+        new THREE.Vector3(island.position.x, 0, island.position.z),
+      );
+    }
+    const compound = cluster.compounds.find(c => c.compound_wort_id === wort.id);
+    wordCard.showWord(wort, cluster.wurzel, compound);
+  });
+  // Search over ALL clusters (not just multi-word ones), so single words are findable too
+  searchBar.setClusters(clusters);
 
   // --- Click/tap interaction ---
   const raycaster = new THREE.Raycaster();

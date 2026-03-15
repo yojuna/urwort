@@ -9,7 +9,7 @@
  */
 import type { RootCluster, Wurzel, Wort, WurzelWortLink, CompoundLink } from '@/types';
 
-/** Raw JSON shape from export-ontology.py */
+/** Raw JSON shape from export-ontology.py (v2) */
 interface OntologyJSON {
   version: number;
   stats: {
@@ -17,6 +17,8 @@ interface OntologyJSON {
     multi_word_clusters: number;
     total_words: number;
     total_compounds: number;
+    clusters_with_etymology_chain?: number;
+    words_with_segments?: number;
   };
   clusters: RawCluster[];
 }
