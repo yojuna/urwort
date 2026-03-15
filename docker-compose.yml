@@ -29,12 +29,12 @@ services:
     environment:
       - NODE_ENV=development
       - URWORT_DB_PATH=/workspace/data/urwort.db
-    # Start Vite dev server by default
+    # Start Vite dev server + FastAPI
     command: >
       bash -c "
         cd /workspace/game && npm install &&
         npm run dev &
-        cd /workspace/api && uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
+        cd /workspace && python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir api &
         wait
       "
 
