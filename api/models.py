@@ -55,3 +55,43 @@ class ErrorResponse(BaseModel):
     message: str
     word: Optional[str] = None
     retry_after: Optional[int] = None
+
+
+class CorpusExample(BaseModel):
+    """Example sentence from corpus"""
+    sentence: str
+    source: str = ""
+    date: str = ""
+    author: str = ""
+    newspaper: str = ""
+    bibl: str = ""  # Bibliographic reference
+    textclass: str = ""  # Text classification (e.g., "Belletristik:Roman")
+
+
+class FrequencyDataPoint(BaseModel):
+    """Single frequency data point"""
+    year: int
+    f: float  # Frequency (per million tokens)
+
+
+class CorpusStats(BaseModel):
+    """Statistics for a corpus"""
+    corpus: str
+    total_occurrences: Optional[int] = None
+    examples_returned: int = 0
+
+
+class DWDSResponse(BaseModel):
+    """DWDS response format"""
+    word: str
+    wortart: str = ""  # Part of speech
+    url: str
+    fetchedAt: int  # Unix timestamp in milliseconds
+    usage: List[str] = Field(default_factory=list)
+    collocations: List[str] = Field(default_factory=list)
+    examples: List[CorpusExample] = Field(default_factory=list)  # Changed to structured examples
+    etymology: Optional[str] = None
+    synonyms: List[str] = Field(default_factory=list)
+    definitions: List[str] = Field(default_factory=list)
+    corpus_stats: Dict[str, Any] = Field(default_factory=dict)  # Stats per corpus (kern, public, etc.)
+    frequency_data: Optional[List[FrequencyDataPoint]] = None  # Frequency over time

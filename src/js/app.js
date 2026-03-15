@@ -1,62 +1,12 @@
-/* app.js — main application: init, routing, event wiring (v2) */
+/* app.js — main application (v3: API-backed, no offline seeding) */
 
 (async () => {
 
-  // ── Seeding: run before anything else ─────────────────────────────────────
-  const overlay   = document.getElementById('seed-overlay');
-  const bar       = document.getElementById('seed-bar');
-  const statusEl  = document.getElementById('seed-status');
-
-  // Ensure overlay starts hidden
-  if (overlay) overlay.hidden = true;
-
-  if (!Search.isSeeded()) {
-    if (overlay) {
-      overlay.hidden = false;
-      overlay.style.display = 'flex'; // Force display in case CSS is missing
-    }
-
-    try {
-      let resumed = false;
-      await Search.seed(({ done, total, letter, dir, resumed: isResumed }) => {
-        if (isResumed && !resumed) {
-          resumed = true;
-          if (statusEl) statusEl.textContent = 'Resuming from previous session…';
-        }
-        const pct = Math.round((done / total) * 100);
-        if (bar) bar.style.width = pct + '%';
-        if (letter && dir && statusEl) {
-          statusEl.textContent = `${dir}  /  ${letter}.json  (${done}/${total})`;
-        }
-      });
-    } catch (err) {
-      // Seeding failed (e.g. offline on first launch)
-      if (statusEl) {
-        statusEl.textContent = 'Failed to build dictionary. Please connect to the internet and reload.';
-      }
-      console.error('[app] seeding error:', err);
-      // Leave overlay visible — app is unusable without index
-      return;
-    }
-
-    // Hide overlay after successful seeding
-    if (overlay) {
-      overlay.hidden = true;
-      overlay.style.display = 'none'; // Force hide
-    }
-  } else {
-    // Already seeded — ensure overlay is hidden
-    if (overlay) {
-      overlay.hidden = true;
-      overlay.style.display = 'none';
-    }
-  }
-
   // ── State ──────────────────────────────────────────────────────────────────
   const state = {
-    dir:          localStorage.getItem('urwort:dir') || 'de-en',
-    currentEntry: null,
-    bookmarkedSet: new Set(), // 'word|dir' keys for O(1) lookup in result cards
+    currentEntryId: null,
+    bookmarkedSet:  new Set(),
+    syncActive:     false,
   };
 
   // ── Routing ────────────────────────────────────────────────────────────────
@@ -65,30 +15,25 @@
   function showPage(name) {
     if (!PAGES.includes(name)) name = 'search';
     PAGES.forEach(p => {
-      document.getElementById('page-' + p).classList.toggle('active', p === name);
+      document.getElementById('page-' + p)?.classList.toggle('active', p === name);
     });
-    document.getElementById('page-detail').classList.remove('active');
-    // Hide loading spinner when navigating away
-    const loadingEl = document.getElementById('detail-loading');
-    if (loadingEl) loadingEl.hidden = true;
-    document.querySelectorAll('.nav-item').forEach(el => {
-      el.classList.toggle('active', el.dataset.page === name);
-    });
+    document.getElementById('page-detail')?.classList.remove('active');
+    document.querySelectorAll('.nav-item').forEach(el =>
+      el.classList.toggle('active', el.dataset.page === name)
+    );
     if (name === 'history')   loadHistory();
     if (name === 'bookmarks') loadBookmarks();
+    if (name === 'settings')  refreshSettingsPage();
   }
 
   function handleHash() {
     const hash = location.hash.replace('#', '') || 'search';
     if (hash === 'detail') {
-      PAGES.forEach(p => document.getElementById('page-' + p).classList.remove('active'));
-      document.getElementById('page-detail').classList.add('active');
+      PAGES.forEach(p => document.getElementById('page-' + p)?.classList.remove('active'));
+      document.getElementById('page-detail')?.classList.add('active');
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     } else {
-      document.getElementById('page-detail').classList.remove('active');
-      // Hide loading spinner when navigating away from detail
-      const loadingEl = document.getElementById('detail-loading');
-      if (loadingEl) loadingEl.hidden = true;
+      document.getElementById('page-detail')?.classList.remove('active');
       showPage(hash);
     }
   }
@@ -96,214 +41,148 @@
   window.addEventListener('hashchange', handleHash);
   handleHash();
 
-  // ── Direction toggle ───────────────────────────────────────────────────────
-  function setDir(dir) {
-    state.dir = dir;
-    localStorage.setItem('urwort:dir', dir);
-    document.getElementById('btn-de-en').classList.toggle('active', dir === 'de-en');
-    document.getElementById('btn-en-de').classList.toggle('active', dir === 'en-de');
-    const q = document.getElementById('search-input').value;
-    if (q.length >= 2) runSearch(q);
-  }
-
-  document.getElementById('btn-de-en').addEventListener('click', () => setDir('de-en'));
-  document.getElementById('btn-en-de').addEventListener('click', () => setDir('en-de'));
-  setDir(state.dir);
-
-  // ── Bookmark set (for result-card star icons) ──────────────────────────────
+  // ── Bookmark set ───────────────────────────────────────────────────────────
   async function refreshBookmarkSet() {
     const all = await DB.bookmarksGetAll();
     state.bookmarkedSet = new Set(all.map(b => b.id));
   }
   await refreshBookmarkSet();
 
-  // ── Search input ───────────────────────────────────────────────────────────
+  // ── Search ─────────────────────────────────────────────────────────────────
   const searchInput = document.getElementById('search-input');
   const clearBtn    = document.getElementById('search-clear');
 
-  searchInput.addEventListener('input', () => {
+  searchInput?.addEventListener('input', () => {
     const q = searchInput.value;
     clearBtn.hidden = q.length === 0;
-    // Auto-detect DE input via umlaut chars
-    const detected = Search.detectDir(q);
-    if (detected && detected !== state.dir) setDir(detected);
     runSearch(q);
   });
 
-  clearBtn.addEventListener('click', () => {
+  clearBtn?.addEventListener('click', () => {
     searchInput.value = '';
     clearBtn.hidden   = true;
-    UI.renderResults(null, state.dir, state.bookmarkedSet);
+    UI.renderResults([], state.bookmarkedSet);
     UI.setSearchStatus('');
     searchInput.focus();
   });
 
   function runSearch(q) {
-    Search.query(q, state.dir, (status, results) => {
+    Search.query(q, ({ status, results, error }) => {
       if (status === 'loading') {
         UI.setSearchStatus('Searching…', true);
         return;
       }
-      UI.renderResults(results, state.dir, state.bookmarkedSet);
+      const list = results || [];
+      UI.renderResults(list, state.bookmarkedSet);
+      if (error) {
+        UI.setSearchStatus(navigator.onLine ? 'Search error' : 'Offline — showing local results');
+      } else {
+        UI.setSearchStatus(
+          list.length
+            ? `${list.length} result${list.length !== 1 ? 's' : ''}`
+            : q.trim().length >= 2 ? 'No results' : ''
+        );
+      }
     });
   }
 
   // ── Result card clicks ─────────────────────────────────────────────────────
-  document.getElementById('results-list').addEventListener('click', async (e) => {
+  document.getElementById('results-list')?.addEventListener('click', async (e) => {
     const bmBtn = e.target.closest('.result-bookmark-btn');
     if (bmBtn) {
       e.stopPropagation();
-      await toggleBookmark(bmBtn.dataset.word, bmBtn.dataset.dir);
+      await toggleBookmark(bmBtn.dataset.id);
       return;
     }
     const card = e.target.closest('.result-card');
-    if (card) openDetail(card.dataset.word, card.dataset.dir);
+    if (card && card.dataset.id) openDetail(card.dataset.id);
   });
 
   ['history-list', 'bookmarks-list'].forEach(listId => {
-    document.getElementById(listId).addEventListener('click', (e) => {
+    document.getElementById(listId)?.addEventListener('click', (e) => {
       const card = e.target.closest('.result-card');
-      if (card) openDetail(card.dataset.word, card.dataset.dir);
+      if (card && card.dataset.id) openDetail(card.dataset.id);
     });
   });
 
   // ── Open word detail ───────────────────────────────────────────────────────
-  async function openDetail(word, dir) {
-    if (!word || !dir) {
-      console.error('[app] openDetail: missing word or dir', { word, dir });
-      return;
-    }
+  async function openDetail(id) {
+    if (!id) return;
 
-    // Show loading spinner
+    // Switch to detail page and show spinner
+    PAGES.forEach(p => document.getElementById('page-' + p)?.classList.remove('active'));
+    document.getElementById('page-detail')?.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    location.hash = 'detail';
+
     const loadingEl = document.getElementById('detail-loading');
     if (loadingEl) loadingEl.hidden = false;
+    document.getElementById('word-detail').innerHTML = '';
 
     try {
-      // 1. Check wordData IDB cache (instant if previously opened)
-      let entry = await DB.wordDataGet(word, dir);
-      console.log('[app] openDetail: wordDataGet result', { word, dir, entry });
-
+      const entry = await Search.getEntry(id);
       if (!entry) {
-        // 2. Not in IDB — fetch from data chunk and cache it (Layer 2)
-        entry = await Search.lookup(word, dir);
-        console.log('[app] openDetail: Search.lookup result', { word, dir, entry });
-        
-        if (!entry) {
-          // Fallback: at minimum show the index row data
-          const indexRow = await DB.wordIndexGet(word, dir);
-          console.log('[app] openDetail: wordIndexGet fallback', { word, dir, indexRow });
-          entry = {
-            w:      word,
-            pos:    indexRow?.pos    || '',
-            gender: indexRow?.gender || null,
-            l1:     { en: indexRow?.hint ? [indexRow.hint] : [], ex: [] },
-          };
-        }
-      }
-
-      if (!entry || !entry.w) {
-        console.error('[app] openDetail: entry is invalid', { word, dir, entry });
         UI.toast('Word not found');
+        history.back();
         return;
       }
 
-      // Record in history with top-2 translations for quick display
-      const translations = (entry.l1?.en || []).slice(0, 2);
-      await DB.historyAdd(word, dir, translations);
+      state.currentEntryId = id;
+      await DB.historyAdd(entry.lemma, entry);
+      await UI.renderDetail(entry, state.bookmarkedSet);
 
-      state.currentEntry = { entry, dir };
-      await UI.renderDetail(entry, dir);
-      wireDetailBookmarkBtn(word, dir, entry);
-      wireKaikkiToggle(word); // Wire expandable Kaikki card
-      location.hash = 'detail';
+      // Wire detail bookmark button
+      wireDetailBookmarkBtn(id, entry);
 
-      // Background: enrich with Kaikki.org data (Layer 3)
-      // Only for German words (de-en direction), and only if online
-      if (dir === 'de-en' && navigator.onLine && !entry.sources?.kaikki) {
-        // Don't await — let it run in background
-        Kaikki.enrichEntry(entry, dir).then(enriched => {
-          // If detail page is still open for this word, re-render to show Kaikki data
-          if (state.currentEntry && state.currentEntry.entry.w === word && state.currentEntry.dir === dir) {
-            state.currentEntry.entry = enriched;
-            UI.renderDetail(enriched, dir);
-            wireDetailBookmarkBtn(word, dir, enriched);
-            wireKaikkiToggle(word); // Re-wire toggle after re-render
-          }
-        }).catch(err => {
-          console.warn('[app] Kaikki enrichment failed:', err);
-          // Silent fail — don't show error to user
-        });
-      }
+    } catch (err) {
+      console.error('[app] openDetail error:', err);
+      UI.toast('Failed to load word');
+      history.back();
     } finally {
-      // Hide loading spinner
       if (loadingEl) loadingEl.hidden = true;
     }
   }
 
-  // ── Wire Kaikki.org expandable card toggle ────────────────────────────────────
-  function wireKaikkiToggle(word) {
-    const wordId = word.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-    const toggleId = `kaikki-${wordId}-toggle`;
-    const contentId = `kaikki-${wordId}-content`;
-    
-    const toggle = document.getElementById(toggleId);
-    const content = document.getElementById(contentId);
-    
-    if (!toggle || !content) return; // No Kaikki card for this word
-    
-    // Remove any existing listeners by cloning
-    const freshToggle = toggle.cloneNode(true);
-    toggle.parentNode.replaceChild(freshToggle, toggle);
-    
-    freshToggle.addEventListener('click', () => {
-      const isExpanded = freshToggle.getAttribute('aria-expanded') === 'true';
-      freshToggle.setAttribute('aria-expanded', !isExpanded);
-      content.hidden = isExpanded;
-      
-      // Rotate icon
-      const icon = freshToggle.querySelector('.kaikki-toggle-icon');
-      if (icon) {
-        icon.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(90deg)';
-      }
-    });
-  }
-
-  function wireDetailBookmarkBtn(word, dir, entry) {
+  function wireDetailBookmarkBtn(id, entry) {
     const btn = document.getElementById('detail-bookmark-btn');
     if (!btn) return;
+    // Clone to remove stale listeners
     const fresh = btn.cloneNode(true);
     btn.parentNode.replaceChild(fresh, btn);
     fresh.addEventListener('click', async () => {
-      await toggleBookmark(word, dir, entry);
-      await UI.renderDetail(entry, dir);
-      wireDetailBookmarkBtn(word, dir, entry);
+      await toggleBookmark(id, entry);
     });
   }
 
   // ── Back button ────────────────────────────────────────────────────────────
-  document.getElementById('back-btn').addEventListener('click', () => history.back());
+  document.getElementById('back-btn')?.addEventListener('click', () => history.back());
 
   // ── Toggle bookmark ────────────────────────────────────────────────────────
-  async function toggleBookmark(word, dir, entry) {
-    const exists = await DB.bookmarkExists(word, dir);
+  async function toggleBookmark(id, entry) {
+    const exists = await DB.bookmarkExists(id);
     if (exists) {
-      await DB.bookmarkRemove(word, dir);
+      await DB.bookmarkRemove(id);
       UI.toast('Bookmark removed');
     } else {
-      const e = entry
-        || await DB.wordDataGet(word, dir)
-        || await Search.lookup(word, dir)
-        || { w: word, pos: '', gender: null, l1: { en: [], ex: [] } };
-      await DB.bookmarkAdd(e, dir);
+      const e = entry || await DB.entryGet(id);
+      if (e) await DB.bookmarkAdd(e);
       UI.toast('Bookmarked!');
     }
     await refreshBookmarkSet();
-    const q = searchInput.value;
+    // Re-render detail if still on same word
+    if (state.currentEntryId === id) {
+      const e = await DB.entryGet(id);
+      if (e) {
+        await UI.renderDetail(e, state.bookmarkedSet);
+        wireDetailBookmarkBtn(id, e);
+      }
+    }
+    const q = searchInput?.value || '';
     if (q.length >= 2) runSearch(q);
   }
 
   // ── History page ───────────────────────────────────────────────────────────
-  document.getElementById('clear-history-btn').addEventListener('click', async () => {
+  document.getElementById('clear-history-btn')?.addEventListener('click', async () => {
     await DB.historyClear();
     loadHistory();
     UI.toast('History cleared');
@@ -320,11 +199,79 @@
     UI.renderBookmarks(items);
   }
 
-  // ── Service Worker registration ────────────────────────────────────────────
+  // ── Settings page ──────────────────────────────────────────────────────────
+  async function refreshSettingsPage() {
+    const count  = await DB.entriesCount();
+    const cursor = await DB.getSyncCursor();
+    const el = id => document.getElementById(id);
+    if (el('setting-entry-count')) el('setting-entry-count').textContent = count.toLocaleString();
+    if (el('setting-sync-cursor')) {
+      el('setting-sync-cursor').textContent = cursor
+        ? new Date(cursor).toLocaleString() : 'Never';
+    }
+    if (el('setting-sync-status')) {
+      el('setting-sync-status').textContent = state.syncActive ? 'Syncing…' : (count > 0 ? 'Up to date' : 'Not synced');
+    }
+  }
+
+  document.getElementById('btn-sync-now')?.addEventListener('click', async () => {
+    UI.toast('Starting sync…');
+    await startBackgroundSync(true);
+    UI.toast('Sync complete');
+    refreshSettingsPage();
+  });
+
+  document.getElementById('btn-clear-cache')?.addEventListener('click', async () => {
+    if (!confirm('Clear all cached entries? You can re-sync at any time.')) return;
+    await DB.entriesClear();
+    await DB.setSyncCursor(0);
+    UI.toast('Cache cleared');
+    refreshSettingsPage();
+  });
+
+  // ── Background sync ────────────────────────────────────────────────────────
+  async function startBackgroundSync(force = false) {
+    if (state.syncActive) return;
+    if (!navigator.onLine) return;
+
+    state.syncActive = true;
+    setSyncIndicator(true);
+
+    try {
+      await Search.sync(({ done }) => {
+        const dot = document.getElementById('sync-dot');
+        if (dot) dot.title = `Synced ${done.toLocaleString()} entries`;
+      });
+    } catch (e) {
+      console.warn('[app] background sync error:', e);
+    } finally {
+      state.syncActive = false;
+      setSyncIndicator(false);
+    }
+  }
+
+  function setSyncIndicator(active) {
+    const dot = document.getElementById('sync-dot');
+    if (!dot) return;
+    dot.hidden = !active;
+    dot.classList.toggle('sync-dot-active', active);
+  }
+
+  // Kick off background sync after 1.5 s (allows app to render first)
+  setTimeout(() => startBackgroundSync(), 1500);
+
+  // ── Online / offline indicator ─────────────────────────────────────────────
+  function updateOnlineStatus() {
+    const bar = document.getElementById('offline-bar');
+    if (bar) bar.hidden = navigator.onLine;
+  }
+  window.addEventListener('online',  updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  updateOnlineStatus();
+
+  // ── Service Worker ─────────────────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(err => {
-      console.warn('[app] SW registration failed:', err);
-    });
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
 })();

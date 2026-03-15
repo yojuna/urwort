@@ -1,186 +1,171 @@
-/* search.js — IDB-first search (v2)
+/* search.js — API-first search with IDB fallback (v3)
  *
- * v2 replaces the chunk-scanning Web Worker with direct IndexedDB prefix
- * queries via Dexie (wordIndex store). Results are immediate after seeding.
+ * No offline seeding required. The API is the primary source.
+ * IndexedDB is a cache that grows as entries are fetched/synced.
  *
- * Public API (same shape as v1 — app.js needs no changes):
- *
- *   Search.query(rawInput, dir, callback)
- *     callback(status, results)  status: 'loading' | 'done' | null
- *     results: array of { w, pos, gender, hint } — same fields the UI needs
- *
- *   Search.lookup(word, dir) → Promise<full-entry | null>
- *     Returns full entry from wordData (IDB) or fetches from data chunk.
- *
- *   Search.detectDir(input) → 'de-en' | null
- *
- *   Search.isSeeded() → boolean
- *
- *   Search.seed(onProgress) → Promise<void>
- *     Runs seeding via seed.worker.js. Resolves when complete.
+ * Public API:
+ *   Search.query(q, callback)         — debounced search
+ *   Search.getEntry(id)               — full entry by ID (IDB → API)
+ *   Search.sync(onProgress)           — background full sync (API → IDB)
+ *   Search.detectDir(input)           — 'de-en' | null
  */
 
 'use strict';
 
 const Search = (() => {
-  // ── German character detection ─────────────────────────────────────────────
-  const DE_CHARS = /[äöüÄÖÜß]/;
+  const API_BASE    = '/api';
+  const DEBOUNCE_MS = 180;
+  let debounceTimer = null;
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   function detectDir(input) {
-    return DE_CHARS.test(input) ? 'de-en' : null;
+    return /[äöüÄÖÜß]/.test(input) ? 'de-en' : null;
   }
 
-  // ── Seeding state ──────────────────────────────────────────────────────────
-  const SEEDED_KEY = 'urwort:seeded';
-
-  function isSeeded() {
-    return localStorage.getItem(SEEDED_KEY) === '1';
-  }
-
-  function markSeeded() {
-    localStorage.setItem(SEEDED_KEY, '1');
-  }
+  // ── Search ─────────────────────────────────────────────────────────────────
 
   /**
-   * Seed the dictionary index via seed.worker.js.
-   * @param {function} onProgress  called with { done, total, letter, dir }
-   * @returns {Promise<void>}
+   * Search for lemmas / inflected forms.
+   * Strategy:
+   *   1. Local IDB prefix match (instant if entries are cached)
+   *   2. API /search?q=... (handles inflected forms, FTS5)
+   *
+   * callback is called with { status: 'loading'|'done', results, source }
+   * where results is an array shaped like API /search results:
+   *   { id, lemma, pos, gender, cefr_level, hint, matched_form? }
    */
-  function seed(onProgress) {
-    return new Promise((resolve, reject) => {
-      const w = new Worker('/js/seed.worker.js');
-
-      w.onmessage = (e) => {
-        const msg = e.data;
-        if (msg.type === 'PROGRESS') {
-          if (typeof onProgress === 'function') onProgress(msg);
-        } else if (msg.type === 'COMPLETE') {
-          markSeeded();
-          w.terminate();
-          resolve();
-        } else if (msg.type === 'ERROR') {
-          w.terminate();
-          reject(new Error(msg.message));
-        }
-      };
-
-      w.onerror = (err) => {
-        w.terminate();
-        reject(err);
-      };
-
-      w.postMessage({ type: 'START' });
-    });
-  }
-
-  // ── Debounce helper ────────────────────────────────────────────────────────
-  let debounceTimer = null;
-  const DEBOUNCE_MS = 150;
-
-  // ── Search: IDB prefix query ───────────────────────────────────────────────
-  /**
-   * Query wordIndex for entries whose word starts with `q`, scoped to `dir`.
-   * Returns up to MAX_RESULTS entries (already in result-card format).
-   */
-  const MAX_RESULTS = 20; // fetch a bit more so we can sort; UI caps at 5
-
-  function query(rawInput, dir, callback) {
-    const q = rawInput.trim();
-
-    if (q.length < 2) {
+  function query(q, callback) {
+    const trimmed = q.trim();
+    if (trimmed.length < 2) {
       clearTimeout(debounceTimer);
-      callback(null, []);
+      callback({ status: 'done', results: [] });
       return;
     }
 
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
+      // 1. Local IDB (fast path when synced)
       try {
-        let results = await DB.wordIndexQuery(q, dir, MAX_RESULTS);
-        console.log('[search] wordIndexQuery raw results', { q, dir, count: results.length, first: results[0] });
-
-        // If no results and not already capitalized, try capitalized form
-        // (German nouns are capitalized, so "haus" → try "Haus")
-        if (results.length === 0 && q[0] >= 'a' && q[0] <= 'z') {
-          const qCap = q[0].toUpperCase() + q.slice(1);
-          results = await DB.wordIndexQuery(qCap, dir, MAX_RESULTS);
-          console.log('[search] wordIndexQuery capitalized results', { qCap, dir, count: results.length });
+        const local = await DB.entriesSearch(trimmed, 15);
+        if (local.length > 0) {
+          // Normalize to search-result shape
+          const results = local.map(e => ({
+            id:         e.id,
+            lemma:      e.lemma,
+            pos:        e.pos,
+            gender:     e.gender,
+            cefr_level: e.cefr_level,
+            hint:       (e.translations || [])[0] || '',
+          }));
+          callback({ status: 'done', results, source: 'local' });
+          return;
         }
+      } catch (e) {
+        console.warn('[search] IDB error:', e);
+      }
 
-        // Normalize IDB rows (word) to UI format (w)
-        const normalized = results.map(row => {
-          if (!row || !row.word) {
-            console.warn('[search] invalid row in results', row);
-            return null;
-          }
-          return {
-            w:      row.word,   // IDB has 'word', UI expects 'w'
-            pos:    row.pos,
-            gender: row.gender,
-            hint:   row.hint,
-          };
-        }).filter(Boolean); // Remove any null entries
-
-        console.log('[search] normalized results', { count: normalized.length, first: normalized[0] });
-        callback('done', normalized);
-      } catch (err) {
-        console.error('[search] IDB query error:', err);
-        callback('done', []);
+      // 2. API search (also catches inflected forms via SQL forms table)
+      callback({ status: 'loading' });
+      try {
+        const res = await fetch(
+          `${API_BASE}/search?q=${encodeURIComponent(trimmed)}`,
+          { signal: AbortSignal.timeout(5000) }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        callback({ status: 'done', results: data.results || [], source: 'api' });
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          callback({ status: 'done', results: [], error: 'timeout' });
+        } else {
+          callback({ status: 'done', results: [], error: e.message });
+        }
       }
     }, DEBOUNCE_MS);
   }
 
-  // ── Lookup: full entry from IDB or data chunk ─────────────────────────────
+  // ── Full entry lookup ──────────────────────────────────────────────────────
+
   /**
-   * Get the full entry for a word (Layer 2).
-   * 1. Check wordData in IDB (cache hit → instant).
-   * 2. On miss: fetch /data/{dir}/data/{letter}.json, find entry, cache it.
+   * Get a full entry by ID (e.g. "Haus|NOUN").
+   * Checks IDB cache first; fetches from API on miss and caches the result.
    * @returns {Promise<object|null>}
    */
-  async function lookup(word, dir) {
-    // 1. IDB cache check
-    const cached = await DB.wordDataGet(word, dir);
+  async function getEntry(id) {
+    // 1. IDB cache
+    const cached = await DB.entryGet(id);
     if (cached) return cached;
 
-    // 2. Fetch from data chunk
-    const letter = getLetter(word);
-    const url = `/data/${dir}/data/${letter}.json`;
-
+    // 2. API
     try {
-      const res = await fetch(url);
+      const res = await fetch(
+        `${API_BASE}/entry/${encodeURIComponent(id)}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
       if (!res.ok) return null;
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('json')) return null;
+      const entry = await res.json();
 
-      const chunk = await res.json();
-      // Find the entry in the chunk
-      const entry = chunk.find(e => e.w === word);
-      if (!entry) return null;
-
-      // Cache it for next time
-      await DB.wordDataPut(entry, dir);
+      // Cache for next time
+      await DB.entryPut(entry);
       return entry;
     } catch (e) {
-      console.error(`[search] lookup fetch error for "${word}":`, e);
+      console.error('[search] getEntry error:', e);
       return null;
     }
   }
 
-  // ── Helper: word → chunk letter ────────────────────────────────────────────
-  const UMLAUT_MAP = {
-    '\u00e4': 'a', '\u00f6': 'o', '\u00fc': 'u', '\u00df': 's',
-    '\u00c4': 'a', '\u00d6': 'o', '\u00dc': 'u',
-  };
+  // ── Background sync ────────────────────────────────────────────────────────
 
-  function getLetter(word) {
-    if (!word) return 'misc';
-    const first = word[0].toLowerCase();
-    if (first >= 'a' && first <= 'z') return first;
-    return UMLAUT_MAP[word[0]] || 'misc';
+  /**
+   * Page through /api/sync and write every entry into IDB.
+   * Enables offline search once complete.
+   *
+   * @param {function} onProgress  called with { done, total, hasMore }
+   * @returns {Promise<number>}  total entries synced in this session
+   */
+  async function sync(onProgress) {
+    let cursor   = await DB.getSyncCursor();
+    let total    = 0;
+    let hasMore  = true;
+
+    while (hasMore) {
+      let data;
+      try {
+        const res = await fetch(
+          `${API_BASE}/sync?since=${cursor}&limit=500`,
+          { signal: AbortSignal.timeout(15000) }
+        );
+        if (!res.ok) break;
+        data = await res.json();
+      } catch (e) {
+        console.error('[search] sync fetch error:', e);
+        break;
+      }
+
+      if (!data.entries || data.entries.length === 0) break;
+
+      // Batch write to IDB
+      for (const entry of data.entries) {
+        await DB.entryPut(entry);
+      }
+      total  += data.entries.length;
+      cursor  = data.next_cursor || cursor;
+      hasMore = !!data.has_more;
+
+      await DB.setSyncCursor(cursor);
+
+      if (onProgress) onProgress({ done: total, hasMore, cursor });
+
+      // Yield to keep the UI responsive
+      if (hasMore) await new Promise(r => setTimeout(r, 30));
+    }
+
+    return total;
   }
 
   // ── Expose ─────────────────────────────────────────────────────────────────
-  return { query, lookup, detectDir, isSeeded, seed };
+  return { query, getEntry, sync, detectDir };
 })();
 
 window.Search = Search;

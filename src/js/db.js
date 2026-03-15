@@ -1,289 +1,166 @@
-/* db.js — Dexie-backed database (layered schema v2)
+/* db.js — Dexie v2 schema (urwort2 DB) for API-backed architecture
  *
- * Requires: vendor/dexie.min.js loaded before this file
+ * DB name: urwort2 (clean break from old chunk-based urwort DB)
  *
- * Schema v4 — four stores:
- *
- *   wordIndex  — Layer 1: search index (word, pos, gender, hint) — seeded once
- *   wordData   — Layer 2: full entries (l1, sources) — lazy populated
- *   history    — Layer 4: recent searches (user data)
- *   bookmarks  — Layer 4: saved words (user data)
- *
- * Migration from v3:
- *   - wordCache → wordData (renamed, same structure)
- *   - wordIndex added (new, for search)
+ * Stores:
+ *   entries   — full entries cached from /api/entry/{id}
+ *               keyed by "lemma|POS" (e.g. "Haus|NOUN")
+ *   syncMeta  — sync cursor { key, value }
+ *   history   — recent searches { lemma, hint, ts }
+ *   bookmarks — saved entries   { id, lemma, entry, savedAt }
  */
 
-const db = new Dexie('urwort');
+const _db = new Dexie('urwort2');
 
-// v1 definition kept so Dexie can migrate existing IndexedDB smoothly
-db.version(1).stores({
-  history:   '++id, word, dir, ts',
-  bookmarks: 'id, word, dir',
-  wordCache: 'id, word, dir, cachedAt',
-});
-
-// v2: add savedAt index to bookmarks (needed for orderBy('savedAt'))
-db.version(2).stores({
-  history:   '++id, word, dir, ts',
-  bookmarks: 'id, word, dir, savedAt',
-  wordCache: 'id, word, dir, cachedAt',
-});
-
-// v3: add compound indexes [word+dir] to silence Dexie perf warnings
-//     and speed up dedup queries in historyAdd / bookmarkExists
-db.version(3).stores({
-  history:   '++id, word, dir, ts, [word+dir]',
-  bookmarks: 'id, word, dir, savedAt, [word+dir]',
-  wordCache: 'id, word, dir, cachedAt',
-});
-
-// v4: add wordIndex (Layer 1) and rename wordCache → wordData (Layer 2)
-db.version(4).stores({
-  wordIndex: 'id, word, dir, pos, [word+dir]',  // Layer 1: search index
-  wordData:  'id, word, dir, cachedAt',         // Layer 2: full entries (renamed from wordCache)
-  history:   '++id, word, dir, ts, [word+dir]',
-  bookmarks: 'id, word, dir, savedAt, [word+dir]',
-}).upgrade(async (tx) => {
-  // Migrate wordCache → wordData
-  const oldCache = await tx.table('wordCache').toArray();
-  if (oldCache.length > 0) {
-    await tx.table('wordData').bulkPut(oldCache.map(row => ({
-      ...row,
-      // Ensure entry structure matches v2 format (no id/meta fields)
-    })));
-  }
-  // wordIndex will be populated by seeding (Step 3)
+_db.version(1).stores({
+  entries:   'id, lemma, pos, updatedAt',
+  syncMeta:  'key',
+  history:   '++id, lemma, ts',
+  bookmarks: 'id, lemma, savedAt',
 });
 
 // ── History ──────────────────────────────────────────────────────────────────
 
-/**
- * Record a search. Deduplicates by word+dir (keeps newest timestamp).
- * @param {string} word
- * @param {string} dir   'de-en' | 'en-de'
- * @param {string[]} [translations]  top-2 translations to show in history list
- */
-async function historyAdd(word, dir, translations = []) {
-  // Compound index [word+dir] makes this dedup query fast
-  await db.history.where('[word+dir]').equals([word, dir]).delete();
-  return db.history.add({ word, dir, translations, ts: Date.now() });
+async function historyAdd(lemma, entry) {
+  // Deduplicate by lemma (keep newest)
+  await _db.history.where('lemma').equals(lemma).delete();
+  return _db.history.add({
+    lemma,
+    hint: (entry?.translations || [])[0] || '',
+    pos:  entry?.pos  || '',
+    id:   entry?.id   || '',
+    ts:   Date.now(),
+  });
 }
 
-/**
- * Return history newest-first, up to `limit` entries.
- */
 async function historyGetAll(limit = 100) {
-  return db.history
-    .orderBy('ts')
-    .reverse()
-    .limit(limit)
-    .toArray();
+  return _db.history.orderBy('ts').reverse().limit(limit).toArray();
 }
 
 async function historyClear() {
-  return db.history.clear();
+  return _db.history.clear();
 }
 
 // ── Bookmarks ─────────────────────────────────────────────────────────────────
 
-/**
- * Bookmark a word. Stores the full entry for offline display.
- * @param {object} entry  — full word entry object from dictionary
- * @param {string} dir    — 'de-en' | 'en-de'
- */
-async function bookmarkAdd(entry, dir) {
-  return db.bookmarks.put({
-    id:    entry.w + '|' + dir,
-    word:  entry.w,
-    dir,
+async function bookmarkAdd(entry) {
+  return _db.bookmarks.put({
+    id:      entry.id,
+    lemma:   entry.lemma,
     entry,
     savedAt: Date.now(),
   });
 }
 
-async function bookmarkRemove(word, dir) {
-  return db.bookmarks.delete(word + '|' + dir);
+async function bookmarkRemove(id) {
+  return _db.bookmarks.delete(id);
 }
 
-async function bookmarkExists(word, dir) {
-  const count = await db.bookmarks.where({ id: word + '|' + dir }).count();
+async function bookmarkExists(id) {
+  const count = await _db.bookmarks.where('id').equals(id).count();
   return count > 0;
 }
 
 async function bookmarksGetAll() {
-  return db.bookmarks.orderBy('savedAt').reverse().toArray();
+  return _db.bookmarks.orderBy('savedAt').reverse().toArray();
 }
 
-// ── Word Index (Layer 1 — search) ────────────────────────────────────────────
+// ── Entries (full cached API responses) ──────────────────────────────────────
 
 /**
- * Get a single word from the index. Returns null if not found.
- * Used by history/bookmarks to get hint translations.
+ * Retrieve a cached entry by ID. Returns the full entry object (not a wrapper).
  */
-async function wordIndexGet(word, dir) {
-  const row = await db.wordIndex.get(word + '|' + dir);
-  return row || null;
-}
-
-/**
- * Query the index by prefix. Used for search.
- * @param {string} query  — prefix to match (e.g. "sch")
- * @param {string} dir    — 'de-en' | 'en-de'
- * @param {number} limit  — max results (default 20)
- */
-async function wordIndexQuery(query, dir, limit = 20) {
-  const q = query.trim();
-  if (q.length < 1) return [];
-  
-  // Simple prefix search (case-sensitive for now; will enhance in Step 4)
-  // For case-insensitive, we'll need to store wordLower as an indexed field
-  const results = await db.wordIndex
-    .where('word')
-    .startsWith(q)
-    .filter(row => row.dir === dir)
-    .limit(limit)
-    .toArray();
-  
-  // If no results and query is lowercase, try capitalized
-  if (results.length === 0 && q[0] >= 'a' && q[0] <= 'z') {
-    const qCap = q[0].toUpperCase() + q.slice(1);
-    return db.wordIndex
-      .where('word')
-      .startsWith(qCap)
-      .filter(row => row.dir === dir)
-      .limit(limit)
-      .toArray();
-  }
-  
-  return results;
+async function entryGet(id) {
+  const row = await _db.entries.get(id);
+  return row ? row.data : null;
 }
 
 /**
- * Seed the index from JSON chunks. Called by seeding worker.
- * @param {Array} entries  — array of index entries from chunk (format: {w, pos, gender, hint})
- * @param {string} dir      — 'de-en' | 'en-de'
+ * Store a full entry received from the API.
  */
-async function wordIndexSeed(entries, dir) {
-  // Build rows with id = "word|dir"
-  const rows = entries.map(e => ({
-    id:     e.w + '|' + dir,
-    word:   e.w,
-    dir,
-    pos:    e.pos || '',
-    gender: e.gender || null,
-    hint:   e.hint || '',
-  }));
-  
-  // Bulk add (Dexie handles duplicates by id)
-  return db.wordIndex.bulkPut(rows);
-}
-
-// ── Word Data (Layer 2 — full entries, lazy populated) ────────────────────────
-
-/**
- * Store a full entry. Called when a word detail is opened for the first time.
- * @param {object} entry  — full entry with l1, sources
- * @param {string} dir    — 'de-en' | 'en-de'
- */
-async function wordDataPut(entry, dir) {
-  return db.wordData.put({
-    id:       entry.w + '|' + dir,
-    word:     entry.w,
-    dir,
-    pos:      entry.pos || '',
-    gender:   entry.gender || null,
-    l1:       entry.l1 || { en: [], ex: [] },
-    sources:  entry.sources || {},
-    cachedAt: Date.now(),
+async function entryPut(entry) {
+  return _db.entries.put({
+    id:        entry.id,
+    lemma:     entry.lemma,
+    pos:       entry.pos,
+    updatedAt: entry.updated_at || Date.now(),
+    data:      entry,
   });
 }
 
 /**
- * Retrieve a full entry. Returns null if not cached.
+ * Prefix-search on lemma (case-insensitive fallback to capitalised).
+ * Returns array of full entry objects.
  */
-async function wordDataGet(word, dir) {
-  const row = await db.wordData.get(word + '|' + dir);
-  if (!row) return null;
-  
-  // Return in the same format as build-dict output
-  return {
-    w:      row.word,
-    pos:    row.pos,
-    gender: row.gender,
-    l1:     row.l1,
-    sources: row.sources,
-  };
+async function entriesSearch(q, limit = 20) {
+  const run = async (prefix) =>
+    _db.entries.where('lemma').startsWith(prefix).limit(limit).toArray();
+
+  let rows = await run(q);
+  if (rows.length === 0 && q.length > 0) {
+    const qCap = q[0].toUpperCase() + q.slice(1);
+    if (qCap !== q) rows = await run(qCap);
+  }
+  return rows.map(r => r.data);
 }
 
-// ── Backward compatibility (deprecated, will be removed after Step 5) ──────────
-
-async function wordCacheGet(word, dir) {
-  return wordDataGet(word, dir);
+/**
+ * Count all cached entries.
+ */
+async function entriesCount() {
+  return _db.entries.count();
 }
 
-async function wordCachePut(entry, dir) {
-  return wordDataPut(entry, dir);
+/**
+ * Clear all cached entries (for cache-wipe from settings).
+ */
+async function entriesClear() {
+  await _db.entries.clear();
 }
 
-// ── Debug helpers (exposed for console inspection) ──────────────────────────
+// ── Sync Meta ─────────────────────────────────────────────────────────────────
+
+async function getSyncCursor() {
+  const row = await _db.syncMeta.get('last_sync_ts');
+  return row ? parseInt(row.value, 10) : 0;
+}
+
+async function setSyncCursor(ts) {
+  return _db.syncMeta.put({ key: 'last_sync_ts', value: String(ts) });
+}
+
+// ── Debug helpers ─────────────────────────────────────────────────────────────
 
 async function debugInspect() {
-  const stats = {
-    wordIndex: {
-      count: await db.wordIndex.count(),
-      sample: await db.wordIndex.limit(3).toArray(),
-    },
-    wordData: {
-      count: await db.wordData.count(),
-      sample: await db.wordData.limit(3).toArray(),
-    },
-    history: {
-      count: await db.history.count(),
-      sample: await db.history.limit(3).toArray(),
-    },
-    bookmarks: {
-      count: await db.bookmarks.count(),
-      sample: await db.bookmarks.limit(3).toArray(),
-    },
+  return {
+    entries:   { count: await _db.entries.count(),   sample: await _db.entries.limit(2).toArray() },
+    history:   { count: await _db.history.count(),   sample: await _db.history.limit(2).toArray() },
+    bookmarks: { count: await _db.bookmarks.count(), sample: await _db.bookmarks.limit(2).toArray() },
+    syncMeta:  { rows:  await _db.syncMeta.toArray() },
   };
-  console.table(stats);
-  return stats;
 }
 
-async function debugSearchWord(word, dir) {
-  const indexRow = await wordIndexGet(word, dir);
-  const dataRow = await wordDataGet(word, dir);
-  const result = { word, dir, indexRow, dataRow };
-  console.log('[DB.debug]', result);
-  return result;
-}
-
-// ── Expose as global ──────────────────────────────────────────────────────────
+// ── Expose ────────────────────────────────────────────────────────────────────
 
 window.DB = {
-  // history
+  // History
   historyAdd,
   historyGetAll,
   historyClear,
-  // bookmarks
+  // Bookmarks
   bookmarkAdd,
   bookmarkRemove,
   bookmarkExists,
   bookmarksGetAll,
-  // word index (Layer 1)
-  wordIndexGet,
-  wordIndexQuery,
-  wordIndexSeed,
-  // word data (Layer 2)
-  wordDataGet,
-  wordDataPut,
-  // backward compatibility (deprecated)
-  wordCacheGet,
-  wordCachePut,
-  // debug
-  debug: {
-    inspect: debugInspect,
-    searchWord: debugSearchWord,
-  },
+  // Entries
+  entryGet,
+  entryPut,
+  entriesSearch,
+  entriesCount,
+  entriesClear,
+  // Sync
+  getSyncCursor,
+  setSyncCursor,
+  // Debug
+  debug: { inspect: debugInspect },
 };

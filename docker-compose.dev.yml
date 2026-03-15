@@ -1,13 +1,59 @@
 # docker-compose.dev.yml
-# Usage:  docker compose -f docker-compose.dev.yml up
+# Development stack
 #
-# - src/ mounted as live volume → edit a file, refresh browser — no rebuild
-# - Port 8080 on all interfaces → accessible from phone on same WiFi
-# - All caching disabled (nginx.dev.conf)
-# - API service with auto-reload enabled
+# First-time setup:
+#   docker compose -f docker-compose.dev.yml run --rm urwort-build
+#
+# Daily development:
+#   docker compose -f docker-compose.dev.yml up
+#
+# Quick test build (5000 Kaikki lines):
+#   docker compose -f docker-compose.dev.yml run --rm urwort-build \
+#     python tools/build-db.py --limit 5000
 
 services:
-  # Nginx frontend (serves PWA static files)
+
+  urwort-build:
+    build:
+      context: .
+      dockerfile: Dockerfile.build
+    image: urwort-build:dev
+    container_name: urwort-build
+    volumes:
+      - ./raw-data:/app/raw-data:ro
+      - ./data:/app/data:rw
+      - ./tools:/app/tools:ro
+    profiles:
+      - build
+
+  urwort-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: urwort-api:dev
+    container_name: urwort-api
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      - ./api:/app/api:rw
+      - ./data:/app/data:rw
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DB_PATH=/app/data/urwort.db
+      - LOG_LEVEL=DEBUG
+      - DWDS_RATE_LIMIT=30
+    restart: unless-stopped
+    networks:
+      - urwort-network
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
   urwort-dev:
     build:
       context: .
@@ -17,36 +63,13 @@ services:
     ports:
       - "0.0.0.0:8080:8080"
     volumes:
-      # Live-edit: any change to src/ is served immediately (no rebuild)
       - ./src:/usr/share/nginx/html:ro
     depends_on:
-      - urwort-api
+      urwort-api:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - urwort-network
-
-  # FastAPI backend (kaikki.org enrichment API)
-  urwort-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
-    image: urwort-api:dev
-    container_name: urwort-api
-    ports:
-      - "0.0.0.0:8000:8000"  # Expose for direct testing
-    volumes:
-      - ./api:/app/api:rw  # Read-write for auto-reload in dev
-    environment:
-      - KAIKKI_API_HOST=0.0.0.0
-      - KAIKKI_API_PORT=8000
-      - KAIKKI_CACHE_TTL=86400
-      - KAIKKI_RATE_LIMIT_PER_MINUTE=100
-      - LOG_LEVEL=DEBUG  # More verbose in dev
-    restart: unless-stopped
-    networks:
-      - urwort-network
-    # Auto-reload enabled for development
-    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 networks:
   urwort-network:

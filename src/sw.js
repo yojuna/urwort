@@ -1,24 +1,20 @@
-/* sw.js — Service Worker v5 (v2 architecture)
+/* sw.js — Service Worker v6 (v3 architecture: API-backed)
  *
  * Cache strategies:
- *   App shell (HTML, CSS, JS, workers, manifest, icons)
- *     → Cache-first, pre-cached on SW install
+ *   App shell (HTML, CSS, JS, manifest, icons)
+ *     → Cache-first, pre-cached on install
  *
- *   /data/{dir}/index/{letter}.json  (slim index chunks — seeding)
- *     → Network-first during seeding (always fresh), cached after
+ *   /api/* (FastAPI backend)
+ *     → Network-only; IDB caching is handled by app.js/db.js
  *
- *   /data/{dir}/data/{letter}.json   (full data chunks — lazy detail)
- *     → Cache-first, populated on first word detail open
+ *   Everything else
+ *     → Network with shell cache fallback
  *
- *   External requests (DWDS API etc.)
- *     → Pass-through, not cached
- *
- * Version: bump SHELL_CACHE to force all clients to update.
+ * Bump SHELL_CACHE version to force full cache update on all clients.
  */
 
-const SHELL_CACHE  = 'urwort-shell-v5';
-const DATA_CACHE   = 'urwort-data-v3';
-const KNOWN_CACHES = [SHELL_CACHE, DATA_CACHE];
+const SHELL_CACHE  = 'urwort-shell-v6';
+const KNOWN_CACHES = [SHELL_CACHE];
 
 const SHELL_ASSETS = [
   '/',
@@ -28,8 +24,6 @@ const SHELL_ASSETS = [
   '/js/vendor/dexie.min.js',
   '/js/db.js',
   '/js/search.js',
-  '/js/kaikki.js',
-  '/js/seed.worker.js',
   '/js/ui.js',
   '/js/app.js',
   '/icons/icon-192.png',
@@ -68,26 +62,16 @@ self.addEventListener('fetch', (event) => {
 
   const path = url.pathname;
 
-  // Slim index chunks: network-first so seeding always gets fresh data,
-  // then cache the response for offline re-seed attempts.
-  if (path.match(/^\/data\/[a-z-]+\/index\//)) {
-    event.respondWith(networkFirstData(event.request));
-    return;
-  }
+  // API calls: pass through (not cached — IDB handles caching)
+  if (path.startsWith('/api/')) return;
 
-  // Full data chunks: cache-first for fast offline detail views.
-  if (path.match(/^\/data\/[a-z-]+\/data\//)) {
-    event.respondWith(cacheFirstData(event.request));
-    return;
-  }
-
-  // Shell assets (HTML, CSS, JS, workers) → cache-first
+  // Shell assets → cache-first
   if (isShellAsset(path)) {
     event.respondWith(cacheFirst(SHELL_CACHE, event.request));
     return;
   }
 
-  // Everything else → network with shell cache backup
+  // Everything else → network with cache fallback
   event.respondWith(networkFirst(event.request));
 });
 
@@ -112,45 +96,6 @@ async function cacheFirst(cacheName, request) {
     return response;
   } catch {
     return new Response('Offline', { status: 503, statusText: 'Offline' });
-  }
-}
-
-async function networkFirstData(request) {
-  // Try network first; fall back to cache; final fallback: empty array
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(DATA_CACHE);
-      cache.put(request, response.clone());
-      return response;
-    }
-  } catch { /* offline */ }
-
-  const cached = await caches.match(request);
-  if (cached) return cached;
-
-  return new Response('[]', {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-async function cacheFirstData(request) {
-  const cached = await caches.match(request);
-  if (cached) return cached;
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(DATA_CACHE);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch {
-    // Return empty array so the app degrades gracefully offline
-    return new Response('[]', {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
   }
 }
 

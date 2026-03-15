@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#1a1a2e" />
-  <meta name="description" content="Urwort — offline German ↔ English dictionary" />
+  <meta name="description" content="Urwort — offline German dictionary with rich linguistic data" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Urwort</title>
@@ -16,18 +16,20 @@
 
   <!-- App Header -->
   <header class="app-header">
-    <span class="app-logo">urwort</span>
-    <div class="header-dir-toggle">
-      <button id="btn-de-en" class="header-toggle-btn active" data-dir="de-en">DE</button>
-      <span class="header-toggle-sep">↔</span>
-      <button id="btn-en-de" class="header-toggle-btn" data-dir="en-de">EN</button>
-    </div>
+    <a href="#search" class="app-logo" aria-label="Home">urwort</a>
+    <!-- Sync indicator dot (hidden when idle) -->
+    <span id="sync-dot" class="sync-dot" title="Syncing…" hidden></span>
   </header>
 
-  <!-- Pages (only one visible at a time via hash routing) -->
+  <!-- Offline bar -->
+  <div id="offline-bar" class="offline-bar" hidden>
+    Offline — showing cached results
+  </div>
+
+  <!-- Pages -->
   <main class="app-main">
 
-    <!-- SEARCH PAGE -->
+    <!-- SEARCH -->
     <section id="page-search" class="page active">
       <div class="search-bar-wrap">
         <div class="search-input-wrap">
@@ -39,27 +41,26 @@
             autocorrect="off"
             autocapitalize="off"
             spellcheck="false"
-            placeholder="Type to search…"
+            placeholder="Search German words…"
             aria-label="Search dictionary"
           />
           <button id="search-clear" class="search-clear" aria-label="Clear search" hidden>✕</button>
         </div>
-      </div><!-- /.search-bar-wrap -->
-
-      <div id="search-status" class="search-status"></div>
+        <div id="search-status" class="search-status"></div>
+      </div>
       <ul id="results-list" class="results-list" role="list" aria-live="polite"></ul>
+    </section>
+
+    <!-- WORD DETAIL -->
+    <section id="page-detail" class="page">
+      <button class="back-btn" id="back-btn">← Back</button>
       <div id="detail-loading" class="detail-loading" hidden>
         <div class="spinner-ring"></div>
       </div>
-    </section>
-
-    <!-- WORD DETAIL PAGE -->
-    <section id="page-detail" class="page">
-      <button class="back-btn" id="back-btn">← Back</button>
       <div id="word-detail" class="word-detail"></div>
     </section>
 
-    <!-- HISTORY PAGE -->
+    <!-- HISTORY -->
     <section id="page-history" class="page">
       <h2 class="page-title">Search History</h2>
       <button id="clear-history-btn" class="text-btn">Clear all</button>
@@ -67,53 +68,91 @@
       <p id="history-empty" class="empty-msg" hidden>No searches yet.</p>
     </section>
 
-    <!-- BOOKMARKS PAGE -->
+    <!-- BOOKMARKS -->
     <section id="page-bookmarks" class="page">
       <h2 class="page-title">Bookmarks</h2>
       <ul id="bookmarks-list" class="results-list" role="list"></ul>
       <p id="bookmarks-empty" class="empty-msg" hidden>No bookmarks yet.</p>
     </section>
 
-    <!-- SETTINGS PAGE -->
-    <section id="page-settings" class="page">
-      <h2 class="page-title">Settings</h2>
-      <div class="settings-placeholder">
-        <p class="settings-note">Settings and configuration options coming soon.</p>
-        <ul class="settings-list">
-          <li class="settings-item">
-            <span class="settings-label">Default direction</span>
-            <span class="settings-value settings-todo">DE → EN</span>
-          </li>
-          <li class="settings-item">
-            <span class="settings-label">Theme</span>
-            <span class="settings-value settings-todo">System default</span>
-          </li>
-          <li class="settings-item">
-            <span class="settings-label">Data sources</span>
-            <span class="settings-value settings-todo">FreeDict</span>
-          </li>
-          <li class="settings-item">
-            <span class="settings-label">Cache size</span>
-            <span class="settings-value settings-todo">—</span>
-          </li>
-          <li class="settings-item">
-            <span class="settings-label">Clear all data</span>
-            <span class="settings-value settings-todo">—</span>
-          </li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- RESOURCES PAGE -->
+    <!-- RESOURCES -->
     <section id="page-resources" class="page">
       <h2 class="page-title">Resources</h2>
       <ul class="resource-list">
-        <li><a href="https://www.dw.com/en/learn-german/s-2469" target="_blank" rel="noopener">DW Learn German</a><span class="resource-desc">Free courses, A1–C1</span></li>
-        <li><a href="https://www.kaikki.org/dictionary/German/" target="_blank" rel="noopener">Kaikki.org</a><span class="resource-desc">Open source German dictionary data</span></li>
-        <li><a href="https://freedict.org/" target="_blank" rel="noopener">FreeDict</a><span class="resource-desc">Free bilingual dictionaries</span></li>
-        <li><a href="https://deutsch.lingolia.com/en/" target="_blank" rel="noopener">Lingolia German</a><span class="resource-desc">Grammar guides</span></li>
-        <li><a href="https://gutenberg.org/browse/languages/de" target="_blank" rel="noopener">Project Gutenberg — German</a><span class="resource-desc">Free German ebooks</span></li>
+        <li>
+          <a href="https://www.dwds.de" target="_blank" rel="noopener">DWDS</a>
+          <span class="resource-desc">Digitales Wörterbuch der deutschen Sprache</span>
+        </li>
+        <li>
+          <a href="https://kaikki.org/dictionary/German/" target="_blank" rel="noopener">Kaikki.org</a>
+          <span class="resource-desc">Open Wiktionary data for German</span>
+        </li>
+        <li>
+          <a href="https://www.dw.com/en/learn-german/s-2469" target="_blank" rel="noopener">DW Learn German</a>
+          <span class="resource-desc">Free courses, A1–C1</span>
+        </li>
+        <li>
+          <a href="https://deutsch.lingolia.com/en/" target="_blank" rel="noopener">Lingolia German</a>
+          <span class="resource-desc">Grammar explanations & exercises</span>
+        </li>
+        <li>
+          <a href="https://freedict.org/" target="_blank" rel="noopener">FreeDict</a>
+          <span class="resource-desc">Free bilingual dictionaries</span>
+        </li>
+        <li>
+          <a href="https://gutenberg.org/browse/languages/de" target="_blank" rel="noopener">Project Gutenberg — German</a>
+          <span class="resource-desc">Free German ebooks</span>
+        </li>
       </ul>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="page-settings" class="page">
+      <h2 class="page-title">Settings</h2>
+
+      <div class="settings-group">
+        <div class="settings-group-title">Data Cache</div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <span class="settings-label">Entries cached</span>
+            <span class="settings-value" id="setting-entry-count">—</span>
+          </div>
+          <div class="settings-item">
+            <span class="settings-label">Last synced</span>
+            <span class="settings-value" id="setting-sync-cursor">Never</span>
+          </div>
+          <div class="settings-item">
+            <span class="settings-label">Sync status</span>
+            <span class="settings-value" id="setting-sync-status">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">Actions</div>
+        <div class="settings-list" style="gap:8px">
+          <button id="btn-sync-now" class="settings-btn">
+            🔄 Sync now
+          </button>
+          <button id="btn-clear-cache" class="settings-btn settings-btn-danger">
+            🗑️ Clear cache
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">About</div>
+        <div class="settings-list">
+          <div class="settings-item">
+            <span class="settings-label">Data sources</span>
+            <span class="settings-value">FreeDict · Kaikki · DWDS</span>
+          </div>
+          <div class="settings-item">
+            <span class="settings-label">Version</span>
+            <span class="settings-value">v3.0</span>
+          </div>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -137,27 +176,13 @@
     </a>
   </nav>
 
-  <!-- Toast notification -->
+  <!-- Toast -->
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <!-- Seeding overlay (shown on first launch while wordIndex is being built) -->
-  <div id="seed-overlay" class="seed-overlay" hidden>
-    <div class="seed-box">
-      <div class="seed-title">urwort</div>
-      <div class="seed-subtitle">Building your dictionary…</div>
-      <div class="seed-bar-wrap">
-        <div id="seed-bar" class="seed-bar"></div>
-      </div>
-      <div id="seed-status" class="seed-status">Starting…</div>
-      <div class="seed-note">Downloading ~38 MB (one-time).<br>Progress is saved — safe to refresh.<br>The app works fully offline after this.</div>
-    </div>
-  </div>
-
-  <!-- Scripts (order matters: Dexie must load before db.js) -->
+  <!-- Scripts (Dexie must load first) -->
   <script src="js/vendor/dexie.min.js"></script>
   <script src="js/db.js"></script>
   <script src="js/search.js"></script>
-  <script src="js/kaikki.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
 </body>

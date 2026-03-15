@@ -88,6 +88,11 @@ src/data/en-de/index/x.json
 src/data/en-de/index/y.json
 src/data/en-de/index/z.json
 
+# Built SQLite database — regenerate with: docker compose run --rm urwort-build
+data/urwort.db
+data/urwort.db-wal
+data/urwort.db-shm
+
 # Pipeline misc
 tools/output/
 tools/*.log
