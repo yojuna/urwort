@@ -773,18 +773,18 @@ Read URLs from `wort.source_urls` or `wurzel.source_urls`. Style as small text, 
 After completing Weeks 1-3:
 
 - [x] 3D world with root islands and word-objects at 30+ fps on mobile
-- [ ] **Morphological decomposition:** colour-coded prefix/root/suffix segments on word card _(Week 1 data + Week 2 UI)_
-- [ ] **Etymology chain:** vertical timeline (NHG → ... → PIE) on island view _(Week 1 data + Week 2 UI)_
-- [ ] **Search bar:** type a word, camera flies to it, card opens _(Week 2)_
+- [x] **Morphological decomposition:** colour-coded prefix/root/suffix segments on word card ✅ _Done (Week 1 data + Week 2 UI)_
+- [x] **Etymology chain:** vertical timeline (oldest→newest) on island view ✅ _Done (Week 1 data + Week 2 UI)_
+- [x] **Search bar:** type a word, camera flies to it, card opens ✅ _Done (Week 2)_
 - [x] Navigation feels like exploration
-- [x] 600+ lexemes present with definitions
-- [ ] **Source citations** visible on every card _(Week 1 data + Week 2 UI)_
+- [x] 600+ lexemes present with definitions (1351 words in ontology)
+- [x] **Source citations** visible on every card ✅ _Done (Week 1 data + Week 2 UI)_
 - [x] Performance: 60fps desktop, 30+ fps mobile, load < 3s
-- [x] Docker: `docker compose up` works
-- [ ] **Data quality:** spot-check 50 entries, ≤5 errors _(Week 3)_
-- [ ] **Code structure:** main.ts < 100 lines, InteractionManager + OntologyStore extracted _(Week 3)_
-- [ ] **Hover effects** on word objects _(Week 3)_
-- [ ] **POS-specific meshes** _(Week 3)_
+- [x] Docker: `docker compose up` works (+ dev.sh / deploy.sh helpers)
+- [ ] **Data quality:** spot-check 50 entries, ≤5 errors _(Week 3 — not started)_
+- [ ] **Code structure:** main.ts < 100 lines, InteractionManager + OntologyStore extracted _(Week 3 — not started)_
+- [ ] **Hover effects** on word objects _(Week 3 — not started)_
+- [ ] **POS-specific meshes** _(Week 3 — not started)_
 
 ---
 
