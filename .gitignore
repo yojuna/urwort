@@ -33,9 +33,9 @@ data/urwort.db
 data/urwort.db-wal
 data/urwort.db-shm
 
-# Generated ontology data — regenerate with pipeline
+# Generated ontology data — regenerate with: python3 tools/export-ontology.py
 data/ontology.json
-game/public/ontology.json
+# Note: game/public/ontology.json is tracked in git (small, needed for static deploy)
 
 # Pipeline misc
 tools/output/

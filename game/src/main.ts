@@ -1,6 +1,6 @@
 /**
  * Urwort — Phase 0 entry point.
- * Sets up the Three.js scene, loads mock data, and starts the render loop.
+ * Sets up the Three.js scene, loads ontology data, and starts the render loop.
  */
 import * as THREE from 'three';
 import { createSceneContext } from '@/scene/renderer';
@@ -9,14 +9,16 @@ import { createKeyboardState, bindKeyboard } from '@/player/input';
 import { computeGridLayout } from '@/world/layout';
 import { createIslandMesh } from '@/world/island';
 import { createBridgeMesh } from '@/world/bridge';
+import { loadOntology } from '@/data/loader';
 import { MOCK_CLUSTERS } from '@/data/mock';
-import type { Island } from '@/types';
+import type { Island, RootCluster } from '@/types';
 
-function main(): void {
+async function main(): Promise<void> {
   const container = document.getElementById('app');
   if (!container) throw new Error('Missing #app container');
 
   const loading = document.getElementById('loading');
+  const loadingText = loading?.querySelector('p');
 
   // --- Init scene ---
   const ctx = createSceneContext(container);
@@ -26,8 +28,29 @@ function main(): void {
   const keyboard = createKeyboardState();
   const cleanupKeyboard = bindKeyboard(keyboard);
 
-  // --- Build world from mock data ---
-  const layout = computeGridLayout(MOCK_CLUSTERS);
+  // --- Load ontology data ---
+  let clusters: RootCluster[];
+
+  try {
+    if (loadingText) loadingText.textContent = 'Loading ontology data...';
+
+    const ontology = await loadOntology({
+      minClusterSize: 2,   // Only show clusters with 2+ words (interesting roots)
+      maxClusters: 200,    // Cap for performance in Phase 0
+    });
+    clusters = ontology.clusters;
+
+    console.log(`[Urwort] Using real ontology: ${clusters.length} clusters`);
+  } catch (err) {
+    // Fallback to mock data if ontology.json not available
+    console.warn('[Urwort] Failed to load ontology, using mock data:', err);
+    clusters = MOCK_CLUSTERS;
+  }
+
+  if (loadingText) loadingText.textContent = 'Building world...';
+
+  // --- Build world ---
+  const layout = computeGridLayout(clusters);
 
   // Create island meshes
   const islandMap = new Map<string, Island>();
@@ -48,9 +71,6 @@ function main(): void {
   const pointer = new THREE.Vector2();
 
   const onPointerUp = (event: PointerEvent) => {
-    // Only handle quick taps/clicks (not drags)
-    // MapControls sets its own internal state; we detect short clicks
-    // by checking if pointer barely moved (handled via threshold)
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -60,7 +80,6 @@ function main(): void {
     const intersects = raycaster.intersectObjects(ctx.scene.children, true);
 
     for (const hit of intersects) {
-      // Walk up to find userData with wort or island data
       let obj: THREE.Object3D | null = hit.object;
       while (obj) {
         if (obj.userData?.type === 'word') {
@@ -68,7 +87,6 @@ function main(): void {
           console.log(`[Urwort] Tapped word: ${wort.lemma} (${wort.definition_en})`);
           break;
         }
-        // If we hit an island group, fly to it
         if (obj.name?.startsWith('island-')) {
           const islandId = obj.name.replace('island-', '');
           const island = islandMap.get(islandId);
@@ -85,9 +103,9 @@ function main(): void {
     }
   };
 
-  // Use pointerup with a movement threshold to distinguish taps from drags
+  // Distinguish taps from drags
   let pointerDownPos = { x: 0, y: 0 };
-  const TAP_THRESHOLD = 5; // pixels
+  const TAP_THRESHOLD = 5;
 
   ctx.renderer.domElement.addEventListener('pointerdown', (e: PointerEvent) => {
     pointerDownPos = { x: e.clientX, y: e.clientY };
