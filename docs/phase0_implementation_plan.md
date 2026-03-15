@@ -1,4 +1,4 @@
-**URWORT — Phase 0 Revised Implementation Plan**
+**URWORT — Phase 0 Implementation Plan**
 
 _The single reference document for Phase 0 development._
 
@@ -14,25 +14,29 @@ March 2026
 
 All major design decisions for Phase 0, recorded with rationale.
 
-| # | Decision | Rationale |
-|---|----------|-----------|
-| D1 | Use TypeScript (not vanilla JS) | Type safety at scale; catches ontology mismatches early |
-| D2 | SQLite for Phase 0 (not Neo4j/graph DB) | Minimal infra; existing pipeline uses it; graph DB in Phase 1 |
-| D3 | Docker dev container (not host install) | Reproducible environment; zero host system pollution |
-| D4 | Keep existing data pipeline, extend it | 60-70% of data work already done; avoid rewriting parsers |
-| D5 | Replace client entirely (new `game/` dir) | Dictionary UI has zero reusable components for 3D game |
-| D6 | No audio in Phase 0 | Reduces scope; audio added in Phase 1-2 |
-| D7 | No exercises/practice mechanics | Phase 0 is discovery-only; exercises are Phase 1 |
-| D8 | No SRS / spaced repetition | Phase 0 proves exploration; SRS is Phase 1-2 |
-| D9 | No PWA / service worker / offline | Phase 0 is a served static site; PWA is Phase 2 |
-| D10 | Minimal ontology entities only | No SoundChange, no separate Kompositum, no computed scores |
-| D11 | Force-directed layout (simple, tune later) | Good enough for prototype; grid fallback if needed |
-| D12 | WASD/arrow + click-to-move + pan navigation | Hybrid model for exploration feel (see §6 for deep analysis) |
-| D13 | Three.js direct (no react-three-fiber) | Maximum control, minimal abstraction for prototype |
-| D14 | Accept "contemplative vs. game" tension | Both aspects implemented minimally; narrative resolution in Phase 1 |
-| D15 | Compound bridges: text-based fallback | Keep pedagogical idea; 3D decomposition if time allows |
-| D16 | Avoid inaccessible sources | Skip GermaNet, CELEX, COSMAS II; use open sources only |
-| D17 | 500 lexemes (A1-A2 core) | Enough to prove concept; expand in Phase 1 |
+| # | Decision | Rationale | Status |
+|---|----------|-----------|--------|
+| D1 | Use TypeScript (not vanilla JS) | Type safety at scale; catches ontology mismatches early | ✅ Done |
+| D2 | SQLite for Phase 0 (not Neo4j/graph DB) | Minimal infra; existing pipeline uses it; graph DB in Phase 1 | ✅ Done |
+| D3 | Docker dev container (not host install) | Reproducible environment; zero host system pollution | ✅ Done |
+| D4 | Keep existing data pipeline, extend it | 60-70% of data work already done; avoid rewriting parsers | ✅ Done |
+| D5 | Replace client entirely (new `game/` dir) | Dictionary UI has zero reusable components for 3D game | ✅ Done |
+| D6 | No audio in Phase 0 | Reduces scope; audio added in Phase 1-2 | ✅ Enforced |
+| D7 | No exercises/practice mechanics | Phase 0 is discovery-only; exercises are Phase 1 | ✅ Enforced |
+| D8 | No SRS / spaced repetition | Phase 0 proves exploration; SRS is Phase 1-2 | ✅ Enforced |
+| D9 | No PWA / service worker / offline | Phase 0 is a served static site; PWA is Phase 2 | ✅ Enforced |
+| D10 | Minimal ontology entities only | No SoundChange, no separate Kompositum, no computed scores | ✅ Done |
+| D11 | Grid layout first, force-directed later | Grid is predictable for prototype; force-directed is Phase 0.5 | ✅ Grid done |
+| D12 | MapControls + WASD + fly-to navigation | Battle-tested touch/mouse handling; custom WASD + fly-to on top | ✅ Done |
+| D13 | Three.js direct (no react-three-fiber) | Maximum control, minimal abstraction for prototype | ✅ Done |
+| D14 | Accept "contemplative vs. game" tension | Both aspects implemented minimally; narrative resolution in Phase 1 | ✅ Enforced |
+| D15 | Compound bridges: text-based fallback | Keep pedagogical idea; 3D decomposition if time allows | ✅ Done (text labels) |
+| D16 | Avoid inaccessible sources | Skip GermaNet, CELEX, COSMAS II; use open sources only | ✅ Enforced |
+| D17 | ~500 lexemes (A1-A2 core) | Enough to prove concept; expand in Phase 1 | ✅ ~600 words exported |
+| D18 | GitHub Pages for static hosting | Zero cost; CI/CD via GitHub Actions; `pages-deploy` branch trigger | ✅ Done |
+| D19 | MapControls over custom camera | Robust damping, touch gestures, polar limits built-in; custom fly-to layered on top | ✅ Done |
+| D20 | Single `export-ontology.py` over 6 scripts | Simpler pipeline; avoids intermediate state; does vocabulary selection + etymology extraction + export in one pass | ✅ Done |
+| D21 | `ontology.json` committed to git | Small file (~400KB); needed for static GitHub Pages deploy; avoids build-time DB dependency | ✅ Done |
 
 ---
 
@@ -46,19 +50,21 @@ Phase 0 proves this or falsifies it. Everything that doesn't serve this hypothes
 
 Phase 0 is complete when ALL of the following are true:
 
-1. **A user can open the app and see a 3D world** with word-objects placed in it, running at 30+ fps on a 2022 mid-range Android phone's Chrome.
-2. **Tapping any word-object shows its morphological decomposition** with root highlighted, affixes colour-coded, and definition displayed.
-3. **Tapping a root monument shows the etymological chain** from NHG back to the deepest recoverable ancestor (PGmc or PIE), with each stage labelled and sourced.
-4. **The search bar works:** type "Haus", camera flies to the Haus word-object.
-5. **Navigation feels like exploration**, not like browsing a diagram. The user moves through the world, not above it.
-6. **All 500 lexemes are present** with correct morphological decomposition, at least one definition, and etymological chain data.
-7. **Source citations are visible** on every word card and etymology view.
-8. **Performance:** 60 fps desktop Chrome, 30+ fps mobile Chrome. Initial load < 3 seconds.
-9. **Runs in Docker:** `docker compose up` and open browser. No host install needed.
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | A user can open the app and see a 3D world with word-objects at 30+ fps on mobile Chrome | ✅ **Done** |
+| 2 | Tapping any word-object shows its morphological decomposition with root highlighted | ⚠️ **Partial** — card shows word + root info, but no colour-coded segment breakdown yet |
+| 3 | Tapping a root monument shows the etymological chain from NHG back to deepest ancestor | ❌ **Not done** — island card shows word list, but no timeline/chain display |
+| 4 | The search bar works: type "Haus", camera flies to it | ❌ **Not done** |
+| 5 | Navigation feels like exploration, not like browsing a diagram | ✅ **Done** — MapControls + WASD + fly-to feels spatial |
+| 6 | All ~500 lexemes are present with correct decomposition, definition, and etymology | ⚠️ **Partial** — 600+ words present, definitions included, etymology roots extracted, but no morphological segment display |
+| 7 | Source citations are visible on every word card | ❌ **Not done** |
+| 8 | Performance: 60 fps desktop, 30+ fps mobile, load < 3s | ✅ **Done** |
+| 9 | Runs in Docker: `docker compose up` and open browser | ✅ **Done** |
 
 ## 1.2 Explicitly Out of Scope
 
-- No WFC world generation. Force-directed + procedural terrain only.
+- No WFC world generation. Grid + procedural terrain only.
 - No biomes or terrain variation. One visual style.
 - No exercises or practice mechanics. Discovery only.
 - No SRS / spaced repetition. No collection mechanic.
@@ -73,21 +79,19 @@ Phase 0 is complete when ALL of the following are true:
 
 ---
 
-# 2. What We Keep from the Existing Codebase
+# 2. What We Kept from the Existing Codebase
 
-The current `main` branch contains a working dictionary app. We build on its data layer and replace its UI.
-
-## 2.1 KEEP: Data Pipeline (`tools/`)
+## 2.1 KEPT: Data Pipeline (`tools/`)
 
 | File | What it does | Status |
 |------|-------------|--------|
-| `tools/build-db.py` | FreeDict + Kaikki + IPA-dict + CEFR → SQLite | **Keep & extend** |
-| `tools/schema.sql` | Dictionary schema (entries, forms, FTS, meta) | **Keep & extend** |
-| `tools/build-dict.py` | Static JSON dict builder | Keep (for legacy dict app) |
+| `tools/build-db.py` | FreeDict + Kaikki + IPA-dict + CEFR → SQLite | ✅ Kept (unchanged) |
+| `tools/schema.sql` | Dictionary schema (entries, forms, FTS, meta) | ✅ Kept (unchanged) |
+| `tools/export-ontology.py` | **NEW** — SQLite + Kaikki → `ontology.json` | ✅ Created |
 
-The Kaikki JSONL parser already extracts: lemma, POS, gender, IPA, etymology_text, senses, derived, related, inflections, examples, synonyms, antonyms, compound_parts, head_templates, audio_url, wikidata. We extend it to also extract `etymology_templates[]` — the structured etymology chain data that is the backbone of the Urwort ontology.
+> **Architecture note:** The original plan called for 6 separate pipeline scripts (`select-vocabulary.py`, `extract-etymology.py`, `decompose-morphology.py`, `build-affixes.py`, `export-ontology.py`, `validate-ontology.py`). In practice, a single `export-ontology.py` handles vocabulary selection, etymology extraction, root clustering, compound detection, and JSON export. This is simpler and avoids intermediate state. Morphological decomposition and affix extraction are deferred to Phase 0.5.
 
-## 2.2 KEEP: Raw Data (`raw-data/`)
+## 2.2 KEPT: Raw Data (`raw-data/`)
 
 | Source | Path | What we have |
 |--------|------|-------------|
@@ -96,110 +100,109 @@ The Kaikki JSONL parser already extracts: lemma, POS, gender, IPA, etymology_tex
 | IPA-dict | `raw-data/ipa-dict/de.tsv` | 130k IPA transcriptions |
 | CEFR | `raw-data/cefr/de.tsv` | A1-C2 word level tags |
 
-## 2.3 KEEP: API Server (`api/`)
+## 2.3 KEPT: API Server (`api/`)
 
 | File | Status |
 |------|--------|
-| `api/main.py` | Keep; add ontology endpoints |
-| `api/db.py` | Keep |
-| `api/enrichment.py` | Keep (DWDS enrichment) |
-| `api/config.py` | Keep |
-| `api/models.py` | Keep; extend for ontology types |
+| `api/main.py` | ✅ Kept; `__init__.py` added for module imports |
+| `api/db.py` | ✅ Kept |
+| `api/enrichment.py` | ✅ Kept |
+| `api/config.py` | ✅ Kept |
+| `api/models.py` | ✅ Kept |
 
-The FastAPI server gets new endpoints for the game client (see §8.3).
+The FastAPI server runs alongside Vite in the Docker container. New game-specific endpoints are planned but not yet added (the game loads `ontology.json` as a static file).
 
-## 2.4 KEEP: Infrastructure (`infra/`)
+## 2.4 REMOVED: Old Client (`src/`)
 
-Docker Compose files, Dockerfiles, and nginx configs exist. We simplify to a single dev container for Phase 0.
+The legacy dictionary PWA (`src/js/app.js`, `search.js`, `db.js`, `index.html`, service worker, CSS) was **removed** from the repository during cleanup. The game client in `game/` is the sole client.
 
-## 2.5 REPLACE: Client (`src/`)
-
-The `src/` directory contains the old dictionary PWA (vanilla JS, Dexie, service worker, search workers). **None of this is reused.** The game client lives in a new `game/` directory.
-
-The `src/` directory remains in the repository as-is (the dictionary app can continue to work alongside the game), but receives no further development in Phase 0.
+Also removed:
+- `src/` directory (entire old dictionary client)
+- `infra/` directory (old Docker/nginx configs)
+- `tools/build-dict.py` (legacy static JSON builder)
+- `docs/implementation_audit.md` (superseded by this document)
+- `docs/phase0_spec.md` (superseded by this document)
+- Various legacy config files (`nginx.conf`, old `docker-compose.yml`, etc.)
 
 ---
 
-# 3. Repository Structure
+# 3. Repository Structure (Actual)
 
 ```
 extras/urwort/
-├── game/                          # NEW — Phase 0 game client
+├── .github/
+│   └── workflows/
+│       └── deploy-pages.yml        # GitHub Pages CI/CD
+│
+├── game/                            # Phase 0 game client
 │   ├── src/
-│   │   ├── main.ts                # Entry point
-│   │   ├── types/                 # TypeScript type definitions
-│   │   │   └── ontology.ts        # Ontology data types
+│   │   ├── main.ts                  # Entry: init scene, load data, render loop, interactions
+│   │   ├── types/
+│   │   │   ├── ontology.ts          # Wurzel, Wort, RootCluster, CompoundLink types
+│   │   │   ├── world.ts             # Island, Bridge, WorldLayout types
+│   │   │   └── index.ts             # Re-exports
 │   │   ├── data/
-│   │   │   └── OntologyStore.ts   # Load, index, query ontology
+│   │   │   ├── loader.ts            # Fetch + filter ontology.json
+│   │   │   └── mock.ts              # 5 example clusters for offline dev
 │   │   ├── scene/
-│   │   │   └── SceneManager.ts    # Renderer, camera, controls, lights, render loop
+│   │   │   └── renderer.ts          # WebGL renderer, camera, lights, ground plane
 │   │   ├── world/
-│   │   │   ├── WorldGenerator.ts  # Orchestrates world generation
-│   │   │   ├── TerrainBuilder.ts  # Ground plane with Perlin noise
-│   │   │   ├── LayoutEngine.ts    # Force-directed root placement
-│   │   │   └── ObjectPlacer.ts    # Word objects + root monuments + paths
-│   │   ├── entities/
-│   │   │   ├── EntityFactory.ts   # Creates 3D meshes (word objects, monuments)
-│   │   │   └── InteractionManager.ts  # Raycasting, hover, selection, card trigger
+│   │   │   ├── layout.ts            # Grid layout for islands
+│   │   │   ├── island.ts            # Island meshes (cylinder + word pillars + labels)
+│   │   │   └── bridge.ts            # Bridge meshes (plank + label)
 │   │   ├── player/
-│   │   │   └── PlayerController.ts    # Movement, camera follow, input handling
+│   │   │   ├── camera.ts            # CameraController (MapControls + WASD + fly-to)
+│   │   │   └── input.ts             # Keyboard state (WASD/arrows)
 │   │   ├── ui/
-│   │   │   ├── WordCard.ts        # CSS2D word card overlay
-│   │   │   ├── EtymologyView.ts   # Etymology chain display
-│   │   │   └── SearchBar.ts       # HTML search with autocomplete
-│   │   └── utils/
-│   │       ├── noise.ts           # Perlin/simplex noise
-│   │       └── helpers.ts         # Math, colour, hash utilities
+│   │   │   └── word-card.ts         # Word info card + island overview card (HTML overlay)
+│   │   ├── entities/                # (empty — future: EntityFactory, InteractionManager)
+│   │   ├── utils/                   # (empty — future: noise, helpers)
+│   │   └── vite-env.d.ts            # Vite env type declarations
 │   ├── public/
-│   │   ├── index.html
-│   │   └── ontology.json          # Generated by pipeline (copied at build time)
-│   ├── package.json
+│   │   └── ontology.json            # Pre-built ontology data (committed to git)
+│   ├── index.html                   # HTML shell with loading screen
+│   ├── package.json                 # three, typescript, vite
+│   ├── package-lock.json
 │   ├── tsconfig.json
-│   └── vite.config.ts
+│   └── vite.config.ts               # Path aliases, base path from env
 │
-├── tools/                         # EXISTING + EXTENDED
-│   ├── build-db.py                # Existing: FreeDict + Kaikki + IPA + CEFR → SQLite
-│   ├── schema.sql                 # Existing + new ontology tables
-│   ├── build-dict.py              # Existing (legacy dict builder)
-│   ├── extract-etymology.py       # NEW: Kaikki etymology_templates → roots + links
-│   ├── decompose-morphology.py    # NEW: Automated morphological decomposition
-│   ├── build-affixes.py           # NEW: Extract affix inventory
-│   ├── select-vocabulary.py       # NEW: Select 500 A1-A2 lexemes
-│   ├── export-ontology.py         # NEW: SQLite → ontology.json for game
-│   └── validate-ontology.py       # NEW: Schema validation + integrity checks
+├── tools/
+│   ├── build-db.py                  # Existing: FreeDict + Kaikki + IPA + CEFR → SQLite
+│   ├── schema.sql                   # Existing: entries, forms, FTS, meta tables
+│   └── export-ontology.py           # NEW: SQLite + Kaikki → ontology.json
 │
-├── api/                           # EXISTING + EXTENDED
-│   ├── main.py                    # + ontology endpoints
+├── api/                             # FastAPI server (runs in Docker)
+│   ├── __init__.py
+│   ├── main.py
 │   ├── db.py
+│   ├── config.py
+│   ├── models.py
 │   ├── enrichment.py
-│   └── ...
+│   ├── dwds.py
+│   ├── kaikki.py
+│   ├── cache.py
+│   └── requirements.txt
 │
-├── raw-data/                      # EXISTING
+├── raw-data/                        # Source data (gitignored, must be present for DB build)
 │   ├── freedict/
 │   ├── kaikki/
 │   ├── ipa-dict/
 │   └── cefr/
 │
-├── data/                          # Build outputs
-│   ├── urwort.db                  # Existing dictionary DB + new ontology tables
-│   └── ontology.json              # NEW: generated game data file
+├── data/
+│   └── urwort.db                    # Built SQLite DB (gitignored)
 │
-├── src/                           # EXISTING (legacy dictionary app, untouched)
+├── docs/
+│   ├── phase0_implementation_plan.md  # THIS DOCUMENT
+│   ├── game_design.md
+│   ├── ontology_spec.md
+│   └── knowledge_base.md
 │
-├── infra/                         # EXISTING
-│   └── docker/
-│
-├── docker-compose.yml             # NEW: simplified Phase 0 dev container
-├── Dockerfile.dev                 # NEW: dev container definition
-│
-└── docs/                          # Specs
-    ├── phase0_implementation_plan.md  # THIS DOCUMENT
-    ├── game_design.md
-    ├── ontology_spec.md
-    ├── phase0_spec.md             # Original (superseded by this doc)
-    ├── implementation_audit.md
-    ├── knowledge_base.md
-    └── legacy/
+├── docker-compose.yml               # Dev container: Vite + FastAPI
+├── Dockerfile.dev                   # Node 22 + Python 3 + SQLite
+├── .dockerignore
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -208,76 +211,43 @@ extras/urwort/
 
 ## 4.1 Docker Dev Container
 
-A single `docker compose up` starts the complete development environment. No host system installation required except Docker.
+A single `docker compose up` starts the complete development environment with both the Vite dev server (port 5173) and FastAPI server (port 8000).
 
-**`docker-compose.yml`** (project root):
+**`docker-compose.yml`** — Mounts source code for live editing; persists node_modules in a Docker volume to avoid host/container mismatch.
 
-```yaml
-services:
-  dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    ports:
-      - "5173:5173"    # Vite dev server
-      - "8000:8000"    # FastAPI server
-    volumes:
-      - .:/app
-      - node_modules:/app/game/node_modules
-    working_dir: /app
-    command: bash
-    stdin_open: true
-    tty: true
-
-volumes:
-  node_modules:
-```
-
-**`Dockerfile.dev`**:
-
-```dockerfile
-FROM node:22-bookworm
-
-# Python for data pipeline + API
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip python3-venv \
-    && rm -rf /var/lib/apt/lists/*
-
-# Python dependencies
-COPY api/requirements.txt /tmp/requirements.txt
-RUN pip3 install --break-system-packages -r /tmp/requirements.txt
-
-WORKDIR /app
-```
+**`Dockerfile.dev`** — Based on `node:22-bookworm-slim`. Installs Python 3, pip, venv, SQLite, git. Creates a Python venv at `/opt/venv`. Pre-installs both npm and pip dependencies for layer caching.
 
 ## 4.2 Development Workflow
 
 ```bash
-# Start the container
-docker compose up -d dev
+# Start everything (game + API)
+docker compose up
+
+# Access:
+#   Game:  http://localhost:5173
+#   API:   http://localhost:8000/api/health
+#   Mobile (same WiFi): http://<host-ip>:5173
+
+# Shell into the container
 docker compose exec dev bash
 
-# Inside the container:
+# Rebuild ontology data (inside container)
+cd /workspace && python3 tools/export-ontology.py
 
-# 1. Build/rebuild the data pipeline
-python3 tools/build-db.py
-python3 tools/extract-etymology.py
-python3 tools/decompose-morphology.py
-python3 tools/build-affixes.py
-python3 tools/select-vocabulary.py
-python3 tools/export-ontology.py
-python3 tools/validate-ontology.py
-
-# 2. Start the game dev server
-cd game && npm install && npm run dev
-
-# 3. Start the API server (if needed)
-cd /app && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Open in host browser:
-# Game:  http://localhost:5173
-# API:   http://localhost:8000/api/health
+# Production build (inside container)
+cd /workspace/game && npm run build
 ```
+
+## 4.3 GitHub Pages Deployment
+
+The game is deployed to GitHub Pages via a GitHub Actions workflow.
+
+- **Trigger:** Push to `pages-deploy` branch
+- **Workflow:** `.github/workflows/deploy-pages.yml`
+- **URL:** `https://<user>.github.io/urwort/`
+- **Deploy command:** `git push origin main:pages-deploy --force`
+- **Base path:** Set via `VITE_BASE_PATH=/urwort/` env var at build time
+- **Data:** `ontology.json` is committed to `game/public/` and included in the build
 
 ---
 
@@ -285,298 +255,178 @@ cd /app && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## 5.1 Game Client
 
-| Concern | Choice | Rationale |
-|---------|--------|-----------|
-| Language | TypeScript (ES2022+ target) | Type safety; ontology data has complex shapes; catch errors early |
-| Build system | Vite 6.x | Fast HMR, native ESM, zero-config TS support, optimised production build |
-| 3D engine | Three.js (r170+) | Industry standard web 3D; direct usage, no wrappers |
-| UI overlay | HTML/CSS + Three.js CSS2DRenderer | Word cards as CSS2D objects anchored to 3D positions; search bar as plain HTML |
-| Framework | None | No React, no Vue. Direct DOM + Three.js. Minimal abstraction for a prototype. |
-| State management | Plain TypeScript classes | No Redux, no Zustand. OntologyStore + WorldState + PlayerState as plain objects. |
+| Concern | Choice | Status |
+|---------|--------|--------|
+| Language | TypeScript (ES2022+ target) | ✅ Done |
+| Build system | Vite 6.x | ✅ Done |
+| 3D engine | Three.js (r170+) | ✅ Done |
+| Camera controls | Three.js MapControls + custom WASD/fly-to layer | ✅ Done |
+| UI overlay | HTML/CSS injected by TypeScript | ✅ Done |
+| Framework | None (direct DOM + Three.js) | ✅ Done |
+| State management | Plain TypeScript (no libraries) | ✅ Done |
 
-## 5.2 Runtime Dependencies (Minimal)
+## 5.2 Runtime Dependencies
 
-The game client has exactly **two** runtime npm dependencies:
+| Package | Purpose | Size |
+|---------|---------|------|
+| `three` | Three.js core + addons (MapControls) | ~600KB minified |
 
-1. **`three`** — Three.js core (~600KB minified). The 3D engine.
-2. **`three/addons`** — OrbitControls, CSS2DRenderer. Bundled with Three.js.
-
-No state management library. No UI framework. No animation library. Every additional dependency must justify itself.
+That's it. One runtime dependency. No state management library, no UI framework, no animation library, no tween library.
 
 ## 5.3 Data Pipeline & API
 
-| Concern | Choice | Rationale |
-|---------|--------|-----------|
-| Pipeline language | Python 3.11+ | Existing pipeline is Python; standard library + minimal deps |
-| Database | SQLite 3 (WAL mode) | Existing; lightweight; more than sufficient for 500 lexemes |
-| API framework | FastAPI | Existing; async; auto-docs |
-| API server | Uvicorn | Existing |
+| Concern | Choice | Status |
+|---------|--------|--------|
+| Pipeline language | Python 3.11+ | ✅ Done |
+| Database | SQLite 3 (WAL mode) | ✅ Done |
+| API framework | FastAPI + Uvicorn | ✅ Done (runs in Docker) |
 
 ## 5.4 Infrastructure
 
-| Concern | Choice | Rationale |
-|---------|--------|-----------|
-| Dev environment | Docker Compose | Reproducible; isolated; one command |
-| Node.js | 22 LTS | Current LTS; stable |
-| Deployment (Phase 0) | Static files (GitHub Pages or similar) | Zero cost; game is fully client-side; ontology.json bundled |
+| Concern | Choice | Status |
+|---------|--------|--------|
+| Dev environment | Docker Compose | ✅ Done |
+| Node.js | 22 LTS | ✅ Done |
+| Deployment | GitHub Pages (static) | ✅ Done |
+| CI/CD | GitHub Actions | ✅ Done |
 
 ---
 
-# 6. Navigation Model — Deep Analysis
+# 6. Navigation Model
 
-This section expands on the critical design choice of how the player moves through the 3D world. The navigation model directly determines whether Phase 0 "feels like exploring a world" or "feels like browsing a diagram."
+## 6.1 Implemented: MapControls + WASD + Fly-to
 
-## 6.1 The Problem
-
-The original Phase 0 spec proposed **pan-to-navigate** (OrbitControls with pan as the movement mechanism). This is the Three.js demo default — you drag to pan the camera, scroll to zoom, right-drag to rotate. It works well for:
-
-- 3D model viewers
-- Data visualisation dashboards
-- Interactive infographics
-
-It does **not** work well for creating a sense of **presence** or **exploration**. The user is a floating eye above the world, not a being *in* the world. The fundamental issue: pan navigation gives you a god-view. Exploration requires a ground-level perspective.
-
-## 6.2 Options Evaluated
-
-| Option | Pros | Cons | Exploration Feel |
-|--------|------|------|-----------------|
-| **A. Pan-to-navigate (OrbitControls)** | Zero implementation cost; well-tested; works on mobile | God-view; feels like a map viewer; no sense of being "in" the world | Low — diagram viewer |
-| **B. Click/tap-to-walk** | Strong exploration feel; intuitive on mobile; destination-driven | Requires pathfinding or simple lerp; need a visible player/cursor on ground | High — feels like a place |
-| **C. WASD / arrow keys (desktop) + virtual joystick (mobile)** | First-person or close-third-person; maximum exploration feel; gamer-familiar | More complex input handling; virtual joysticks feel bad on mobile; not accessible | High — traditional game feel |
-| **D. Hybrid: Click-to-walk + WASD + scroll-zoom** | Best of B & C; multiple input methods suit multiple users; progressive disclosure | More code; need to handle input conflicts | High — flexible |
-
-## 6.3 Phase 0 Choice: Option D — Hybrid Navigation
-
-We implement a **hybrid navigation model** that supports multiple input methods. This is more work than pure OrbitControls, but it directly determines whether the prototype proves or falsifies the core concept.
-
-### Ground Rules
-
-1. **The camera is always close to the ground.** Elevation angle locked between 25°–70° above horizontal. No bird's-eye / map view. The player sees the world from an over-the-shoulder perspective, not a satellite view.
-2. **There is a visible "focus point" on the ground** (a subtle glowing circle or marker). This is where the camera looks at. This is "you."
-3. **Movement always happens along the ground plane.** No flying. The camera follows the focus point.
+The original plan proposed a fully custom `PlayerController` (~400 lines). In practice, we use **Three.js MapControls** as the base (battle-tested touch/mouse handling, damping, polar limits) and layer custom features on top.
 
 ### Input Methods (all active simultaneously)
 
 | Input | Desktop | Mobile | What it does |
 |-------|---------|--------|-------------|
-| **Click/tap ground** | Left-click on terrain | Tap on terrain | Focus point smoothly moves to clicked position (lerp over 0.5–1s). Camera follows. This is the **primary exploration method.** |
-| **Click/tap object** | Left-click on word-object or monument | Tap on object | Opens word card / etymology view. Camera slightly adjusts to frame the object. |
-| **WASD / Arrow keys** | Keyboard | N/A | Continuous movement of focus point. Speed: ~8 world units/sec. Camera follows smoothly. |
-| **Scroll wheel** | Mouse wheel | Pinch | Zoom in/out (distance from focus point to camera). Clamped: min 3, max 25 world units. |
-| **Right-drag** | Right mouse button + drag | Two-finger drag | Rotate camera around focus point. Horizontal: full 360°. Vertical: 25°–70°. |
-| **Virtual joystick** | N/A | On-screen thumb joystick (bottom-left) | Continuous movement, equivalent to WASD. Only shown on touch devices. Subtle, semi-transparent. |
-| **Edge panning** | Move cursor to screen edge | N/A | Optional: subtle slow pan when cursor near viewport edge. Disabled by default, toggle in settings. |
+| **Left-drag** | Left-click + drag | 1-finger drag | Pan across world (XZ plane) |
+| **Right-drag** | Right-click + drag | 2-finger rotate | Orbit camera around target |
+| **Scroll** | Mouse wheel | Pinch | Zoom in/out |
+| **WASD / Arrows** | Keyboard | N/A | Translate camera target on XZ plane |
+| **Tap object** | Click word pillar | Tap word pillar | Show word info card |
+| **Tap island** | Click island | Tap island | Fly camera to island + show root card |
+| **Tap empty** | Click empty space | Tap empty space | Dismiss info card |
+| **Escape** | Keyboard | N/A | Dismiss info card |
 
-### Camera Behaviour
+### Camera Configuration
 
 ```
-Camera position = focusPoint + sphericalOffset
-  where sphericalOffset = {
-    radius: zoomLevel (3–25, default 12),
-    phi: elevationAngle (25°–70°, default 50°),
-    theta: rotationAngle (0°–360°, default 0°)
-  }
+MapControls settings:
+  enableDamping: true
+  dampingFactor: 0.08
+  minDistance: 8          (closest zoom)
+  maxDistance: 100        (farthest zoom)
+  minPolarAngle: 0.2     (nearly top-down)
+  maxPolarAngle: 1.45    (nearly horizon)
+  panSpeed: 1.5
+  rotateSpeed: 0.5
+  screenSpacePanning: false  (pan along world XZ, not screen space)
+
+WASD layer:
+  moveSpeed: 25 units/sec
+  Direction: camera-forward projected onto XZ plane
+
+Fly-to animation:
+  duration: 0.8s
+  easing: cubic ease-out
+  target: island center position
 ```
 
-When the focus point moves (via click-to-walk or WASD), the camera follows with smooth damping (lerp factor ~0.05 per frame). This creates a natural, slightly delayed camera that feels organic rather than rigidly attached.
+### Why MapControls + Custom Layer
 
-### Why This Works for Phase 0
+1. **MapControls** handles all pointer/touch complexity (drag disambiguation, inertia, polar clamping, pinch-zoom) — well-tested across browsers and devices.
+2. **Custom WASD layer** translates the MapControls target along the camera's XZ-projected forward/right vectors, giving a game-like movement feel.
+3. **Custom fly-to** smoothly animates the target position with cubic ease-out, used when tapping islands.
+4. **No virtual joystick** yet — MapControls' 1-finger pan works well on mobile. Virtual joystick is Phase 0.5 if needed.
 
-- **Click-to-walk gives purpose.** You see a distant root monument, you click it, you travel there. This is exploration, not browsing.
-- **WASD gives agency.** Desktop users who want fine-grained control get it. Feels like a game.
-- **Virtual joystick handles mobile.** Touch users get a familiar mobile game control without complex gesture disambiguation.
-- **Zoom gives overview when needed.** Zooming out lets you survey the landscape, zooming in lets you inspect detail. But you're always tethered to a ground position — you can't zoom out to god-view.
-- **Rotation gives immersion.** Looking around from your position on the ground creates spatial awareness.
+### Implementation
 
-### Implementation Complexity
+- `player/camera.ts` — `CameraController` class (~150 lines): wraps MapControls, adds WASD translation, fly-to animation
+- `player/input.ts` — `KeyboardState` + `bindKeyboard()` (~60 lines): tracks WASD/arrow key state
 
-This is more work than pure OrbitControls, but the implementation is straightforward:
+### Not Implemented (Deferred)
 
-- **PlayerController class** (~200 lines): manages focus point position, spherical camera offset, input listeners, lerp/damping.
-- **Click-to-walk**: Raycast to ground plane → set target position → lerp focus point.
-- **WASD**: Each frame, move focus point by velocity vector in camera-relative direction.
-- **Virtual joystick**: Use a simple HTML overlay with touch event math. ~100 lines. Or use `nipplejs` (tiny library, 3KB).
-- **Camera update**: Each frame, compute camera position from focus point + spherical offset. Apply damping.
-
-Total: ~400 lines of TypeScript for the complete navigation system. Estimated implementation time: 4–6 hours.
-
-### What We Explicitly Don't Do
-
-- No avatar/character model. The "player" is an invisible point on the ground with a camera following it.
-- No collision detection with objects. You can walk through word-objects and monuments. Collision adds nothing to the learning experience and adds significant complexity.
-- No pathfinding. Click-to-walk uses straight-line lerp. If something is in the way, you pass through it.
-- No walk animation or footstep effects. The camera glides smoothly to the target.
-
-### Risk and Fallback
-
-If the hybrid system proves too complex or has input conflicts, fall back to **Option B (click-to-walk only)**. This is a subset of Option D — we just disable WASD and the virtual joystick. Click-to-walk alone still provides the exploration feel.
+- Virtual joystick (MapControls pan is sufficient for now)
+- Click-to-walk (tap on ground → move there)
+- Focus point marker (glowing ring on ground)
+- Edge panning
 
 ---
 
 # 7. Ontology Data Model (Phase 0 — Minimal)
 
-## 7.1 Design Principles for Phase 0
+## 7.1 TypeScript Types
 
-- **Roots, affixes, and lexemes only.** Three entity types, not seven.
-- **Etymology chains as JSON arrays on roots**, not a separate Etymon entity table. This avoids graph traversal complexity while preserving all the data.
-- **No SoundChange entity.** Sound changes stored as text within etymology chain entries.
-- **No separate Kompositum entity.** Compounds are handled as a `word_formation_type: "composition"` on the morphological decomposition, with `compound_parts` as a JSON field.
-- **No computed scores.** No `productivity_score`, no `root_value_score`. These require corpus analysis infrastructure that doesn't exist yet.
-- **Source provenance on everything.** Every data point has a source reference.
-
-## 7.2 SQLite Schema Extensions
-
-These tables are **added** to the existing `schema.sql` alongside the `entries`, `forms`, and `meta` tables. The existing dictionary continues to work.
-
-```sql
--- ── Ontology: Root morphemes ─────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS roots (
-    id              TEXT PRIMARY KEY,   -- 'nhg:steh', 'pgmc:*standanan'
-    form            TEXT NOT NULL,      -- 'steh-/stand-'
-    stage           TEXT NOT NULL,      -- 'nhg', 'mhg', 'ohg', 'pgmc', 'pie', 'latin', 'greek', 'french'
-    core_meaning    TEXT,               -- 'to stand'
-    is_reconstructed INTEGER DEFAULT 0, -- 1 for PIE/PGmc reconstructions
-    allomorphs      TEXT DEFAULT '[]',  -- JSON: ["steh","stand","stünd","stund"]
-    cognates        TEXT DEFAULT '[]',  -- JSON: [{"lang":"en","form":"stand"}, ...]
-    etymology_chain TEXT DEFAULT '[]',  -- JSON: [{stage,form,meaning,source,is_reconstructed}, ...]
-    sources         TEXT DEFAULT '{}',  -- JSON source provenance
-    created_at      INTEGER NOT NULL,
-    updated_at      INTEGER NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_roots_stage ON roots(stage);
-
--- ── Ontology: Affixes ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS affixes (
-    id                  TEXT PRIMARY KEY,   -- 'prefix:ver', 'suffix:ung'
-    form                TEXT NOT NULL,      -- 'ver-', '-ung'
-    position            TEXT NOT NULL,      -- 'prefix', 'suffix', 'circumfix'
-    separable           INTEGER,            -- for verbal prefixes (1=sep, 0=insep, NULL=n/a)
-    semantic_functions  TEXT DEFAULT '[]',  -- JSON: ["completion","transformation","error"]
-    grammatical_effect  TEXT,               -- JSON: {"output_pos":"NOUN","output_gender":"f"}
-    sources             TEXT DEFAULT '{}',
-    created_at          INTEGER NOT NULL,
-    updated_at          INTEGER NOT NULL
-);
-
--- ── Ontology: Morphological decompositions ───────────────────────────────
-CREATE TABLE IF NOT EXISTS morphological_decompositions (
-    entry_id            TEXT PRIMARY KEY,    -- FK to entries.id ("verstehen|VERB")
-    segments            TEXT NOT NULL,       -- JSON: [{"form":"ver","type":"prefix","ref":"prefix:ver"}, ...]
-    word_formation_type TEXT,                -- 'prefixation','suffixation','composition','conversion','simplex'
-    compound_parts      TEXT,                -- JSON: [{"stem_ref":"...","role":"head|modifier","fugen":"s"}]
-    is_compound         INTEGER DEFAULT 0,
-    sources             TEXT DEFAULT '{}',
-    verified            INTEGER DEFAULT 0    -- 1 = human verified
-);
-
--- ── Ontology: Root-to-entry links (derivation) ──────────────────────────
-CREATE TABLE IF NOT EXISTS root_lexeme_links (
-    root_id     TEXT NOT NULL,  -- FK to roots.id
-    entry_id    TEXT NOT NULL,  -- FK to entries.id
-    link_type   TEXT DEFAULT 'derived_from', -- 'derived_from','compound_member'
-    PRIMARY KEY (root_id, entry_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_rll_root ON root_lexeme_links(root_id);
-CREATE INDEX IF NOT EXISTS idx_rll_entry ON root_lexeme_links(entry_id);
-
--- ── Ontology: Root adjacency (precomputed for layout) ───────────────────
-CREATE TABLE IF NOT EXISTS root_adjacency (
-    root_a  TEXT NOT NULL,
-    root_b  TEXT NOT NULL,
-    weight  REAL DEFAULT 1.0,  -- connection strength (shared lexemes, shared affixes)
-    reason  TEXT,               -- 'shared_lexeme:Verständigung', 'shared_affix:ver-'
-    PRIMARY KEY (root_a, root_b)
-);
-```
-
-## 7.3 Ontology JSON Export Format
-
-The `ontology.json` file consumed by the game client. Generated by `tools/export-ontology.py` from the SQLite tables.
+The game client uses these types (defined in `game/src/types/ontology.ts`):
 
 ```typescript
-interface OntologyFile {
-  version: string;                    // "0.1.0"
-  generated: string;                  // ISO 8601 timestamp
-  stats: {
-    lexemes: number;
-    roots: number;
-    affixes: number;
-  };
-  sources: Record<string, {
-    name: string;
-    url: string;
-    access: "free_online" | "open_data" | "academic";
-  }>;
-  roots: Record<string, RootData>;     // keyed by root_id
-  affixes: Record<string, AffixData>;  // keyed by affix_id
-  lexemes: Record<string, LexemeData>; // keyed by entry_id
-  adjacency: Array<[string, string, number]>;  // [root_a, root_b, weight]
-}
-
-interface RootData {
+interface Wurzel {
   id: string;
-  form: string;
-  stage: string;
-  core_meaning: string;
-  is_reconstructed: boolean;
-  allomorphs: string[];
-  cognates: Array<{ lang: string; form: string }>;
-  etymology_chain: Array<{
-    stage: string;
-    form: string;
-    meaning?: string;
-    is_reconstructed: boolean;
-    source: string;
-  }>;
-  derived_lexemes: string[];  // entry_ids
-  sources: Record<string, any>;
+  form: string;            // e.g. "fahr"
+  meaning_de: string;
+  meaning_en: string;
+  origin_lang: string;     // "PIE" | "OHG" | "MHG" | "Proto-Germanic" etc.
+  proto_form?: string;     // e.g. "*per-" for PIE ancestor
 }
 
-interface AffixData {
+interface Wort {
   id: string;
-  form: string;
-  position: "prefix" | "suffix" | "circumfix";
-  separable?: boolean;
-  semantic_functions: string[];
-  grammatical_effect?: {
-    output_pos?: string;
-    output_gender?: string;
-  };
-}
-
-interface LexemeData {
-  id: string;            // "verstehen|VERB"
-  lemma: string;         // "verstehen"
-  pos: string;           // "VERB"
-  gender?: string;       // "m" | "f" | "n"
+  lemma: string;           // e.g. "Erfahrung"
+  pos: string;             // part of speech
   ipa?: string;
-  cefr_level?: string;
-  frequency_class?: number;
-  definitions: string[];
-  morphological_segments: Array<{
-    form: string;
-    type: "root" | "prefix" | "suffix" | "circumfix" | "linking_element";
-    ref?: string;          // root_id or affix_id
-  }>;
-  word_formation_type: string;
-  is_compound: boolean;
-  etymology_summary: string;  // Short text for word card display
-  root_ids: string[];         // Which roots this lexeme connects to
-  sources: Record<string, any>;
+  frequency?: number;
+  cefr_level?: string;     // A1-C2
+  definition_de?: string;
+  definition_en?: string;
+}
+
+interface CompoundLink {
+  compound_wort_id: string;
+  component_wort_ids: string[];
+  split_display: string;   // e.g. "Fahr·rad"
+}
+
+interface RootCluster {
+  wurzel: Wurzel;
+  words: Wort[];
+  links: WurzelWortLink[];
+  compounds: CompoundLink[];
 }
 ```
 
-Target file size: ~2–4 MB uncompressed, ~400–800 KB gzipped. Well within browser limits for a single fetch.
+## 7.2 `ontology.json` Format
 
----
+The static JSON file consumed by the game client. Generated by `tools/export-ontology.py`.
 
-# 8. Data Pipeline
+```json
+{
+  "version": 1,
+  "stats": {
+    "total_clusters": 333,
+    "multi_word_clusters": 82,
+    "total_words": 635,
+    "total_compounds": 48
+  },
+  "clusters": [
+    {
+      "wurzel": { "id": "r-0", "form": "fahr", "origin_lang": "OHG", ... },
+      "words": [ { "id": "fahren|VERB", "lemma": "fahren", ... }, ... ],
+      "links": [ { "wurzel_id": "r-0", "wort_id": "fahren|VERB" }, ... ],
+      "compounds": [ { "compound_wort_id": "...", "split_display": "Fahr·rad" }, ... ]
+    },
+    ...
+  ]
+}
+```
 
-## 8.1 Pipeline Overview
+Current file size: ~400KB uncompressed.
 
-The pipeline extends the existing `build-db.py` with new ontology-specific steps.
+## 7.3 Pipeline Architecture
+
+The plan originally specified 6 separate scripts. In practice, a single `tools/export-ontology.py` handles the full pipeline:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -590,565 +440,334 @@ The pipeline extends the existing `build-db.py` with new ontology-specific steps
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ NEW ONTOLOGY STEPS                                           │
+│ export-ontology.py (single script, 6 phases)                │
 │                                                              │
-│  select-vocabulary.py                                        │
-│    entries (CEFR A1-A2, content words) → vocabulary_seed     │
+│  Phase A: load_vocabulary()                                  │
+│    entries (CEFR A1-A2, content words) → vocab dict          │
 │                                                              │
-│  extract-etymology.py                                        │
-│    Kaikki etymology_templates[] → roots + etymology_chain    │
+│  Phase B: load_kaikki_etymology()                            │
+│    Kaikki JSONL → etymology_templates per word               │
 │                                                              │
-│  decompose-morphology.py                                     │
-│    vocabulary_seed + Kaikki data → morphological_decomps     │
+│  Phase C: extract_root() per word                            │
+│    etymology_templates → root form + lang + proto_form       │
+│    Priority: PIE > Proto-Germanic > OHG > MHG                │
 │                                                              │
-│  build-affixes.py                                            │
-│    decompositions → affix inventory                          │
+│  Phase D: build_root_clusters()                              │
+│    Group words by shared root → RootCluster[]                │
+│    Adopt unrooted words via derived[] backlinks              │
+│    Fallback: group remaining by stem prefix                  │
 │                                                              │
-│  export-ontology.py                                          │
-│    all tables → ontology.json                                │
+│  Phase E: detect_compound() per word                         │
+│    Kaikki compound templates or "X + Y" etymology patterns   │
 │                                                              │
-│  validate-ontology.py                                        │
-│    ontology.json → validation report                         │
+│  Phase F: resolve_compound_links()                           │
+│    Map compound part lemmas → wort IDs for bridge drawing    │
+│                                                              │
+│  Output: game/public/ontology.json                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 8.2 Pipeline Scripts (Detail)
+### What the Pipeline Produces (Current Stats)
 
-### `tools/select-vocabulary.py`
-- **Input:** `entries` table (from build-db.py), `cefr` data.
-- **Logic:** Select ~500 lexemes: all A1 content words (nouns, verbs, adjectives, adverbs), fill remaining from A2, cross-reference against DWDS frequency to ensure high-frequency. Exclude function words (articles, pronouns, prepositions — minimal morphological structure).
-- **Output:** Inserts into a `vocabulary_seed` table or writes `data/vocabulary_seed.json`.
+- **635 words** in 333 root clusters
+- **82 multi-word clusters** (2+ words sharing a root)
+- **48 compound links** detected
+- All A1-A2 content words (nouns, verbs, adjectives, adverbs)
 
-### `tools/extract-etymology.py`
-- **Input:** Kaikki JSONL files (`raw-data/kaikki/*.jsonl`), specifically the `etymology_templates[]` field.
-- **Logic:** For each vocabulary seed lemma:
-  1. Find matching Kaikki entry.
-  2. Parse `etymology_templates[]` — each template has: `name` (inh/bor/der/cog), `args` (language code + form).
-  3. Chain the templates to build root entities at each historical stage: NHG → MHG (gmh) → OHG (goh) → PGmc (gem-pro) → PIE (ine-pro).
-  4. For loanwords (bor templates): record the borrowing source (lat, grc, fro).
-  5. Build cognate links from `cog` templates.
-- **Output:** Populates `roots`, `root_lexeme_links`, `root_adjacency` tables.
+### Pipeline Scripts Still Planned (Phase 0.5)
 
-### `tools/decompose-morphology.py`
-- **Input:** Vocabulary seed + existing `entries` data (etymology_text, derived[], compound_parts, head_templates).
-- **Logic:** For each seed lexeme:
-  1. Check if Kaikki provides `literal_meaning` (compound decomposition).
-  2. Use known prefix/suffix patterns against the lemma (e.g., "ver-" prefix, "-ung" suffix).
-  3. Cross-reference with the roots extracted by `extract-etymology.py`.
-  4. Fallback: flag as `verified=0` for human review.
-- **Output:** Populates `morphological_decompositions` table.
-
-### `tools/build-affixes.py`
-- **Input:** `morphological_decompositions` table.
-- **Logic:** Collect unique prefixes and suffixes from decompositions. For each affix:
-  1. Count frequency of occurrence.
-  2. Assign semantic functions from a manually curated seed file (~50–80 common German affixes).
-  3. Record grammatical effects (e.g., `-ung` → feminine noun, `-lich` → adjective).
-- **Output:** Populates `affixes` table.
-
-### `tools/export-ontology.py`
-- **Input:** All ontology tables + `entries` table.
-- **Logic:** JOIN across tables, structure into `OntologyFile` format, write JSON.
-- **Output:** `data/ontology.json`. Also copies to `game/public/ontology.json`.
-
-### `tools/validate-ontology.py`
-- **Input:** `data/ontology.json`.
-- **Checks:**
-  - Every lexeme references roots and affixes that exist.
-  - Every etymology chain has ≥2 stages.
-  - Every entry has ≥1 source citation.
-  - No orphan roots (roots with no lexemes).
-  - IPA strings are syntactically valid (basic regex).
-  - Referential integrity across all links.
-- **Output:** Validation report to stdout. Exit code 0 if valid, 1 if errors.
-
-## 8.3 API Endpoints (New)
-
-Added to `api/main.py`:
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `GET /api/ontology.json` | GET | Serve the static ontology.json file (Phase 0 primary) |
-| `GET /api/ontology/root/{root_id}` | GET | Root + full etymology chain + all derived lexemes |
-| `GET /api/ontology/family/{root_id}` | GET | Complete root family as self-contained JSON |
-| `GET /api/ontology/search/{query}` | GET | Word → decomposition + root references |
-| `GET /api/ontology/stats` | GET | Ontology statistics |
-
-For Phase 0, the game client fetches `ontology.json` as a single static file. The API endpoints are optional convenience (useful for debugging and the review tool).
+| Script | Purpose | Priority |
+|--------|---------|----------|
+| `decompose-morphology.py` | Colour-coded segment breakdown (prefix/root/suffix) | High — needed for success criterion #2 |
+| `build-affixes.py` | Extract German affix inventory with semantic functions | Medium |
+| `validate-ontology.py` | Schema validation + integrity checks | Low |
 
 ---
 
-# 9. 3D Scene Architecture
+# 8. 3D Scene Architecture
 
-## 9.1 Scene Setup
+## 8.1 Scene Setup (Implemented)
 
-| Component | Specification |
-|-----------|--------------|
-| Renderer | WebGLRenderer. `antialias: true` desktop, `false` mobile. `pixelRatio: min(devicePixelRatio, 2)`. |
-| Camera | PerspectiveCamera, FOV 50, positioned via PlayerController spherical offset. |
-| Lighting | 1 DirectionalLight (warm white, intensity 1.0, no shadows) + 1 AmbientLight (cool blue-grey, intensity 0.4). Two lights total. |
-| Background | Solid warm parchment. `scene.background = new THREE.Color(0xE8E4D9)`. |
-| Fog | `THREE.Fog(0xE8E4D9, 60, 120)`. Hides distant objects, creates atmosphere. |
-| CSS2DRenderer | Layered on top of WebGL canvas. For word cards and UI labels. |
+| Component | Specification | Status |
+|-----------|--------------|--------|
+| Renderer | WebGLRenderer, `antialias: true`, `pixelRatio: min(dpr, 2)`, PCFSoftShadowMap | ✅ Done |
+| Camera | PerspectiveCamera, FOV 60, MapControls spherical offset | ✅ Done |
+| Lighting | 1 AmbientLight (white, 0.6) + 1 DirectionalLight (warm, 0.8, shadows) | ✅ Done |
+| Background | Sky blue (`#87CEEB`) | ✅ Done |
+| Fog | `THREE.Fog(0x87CEEB, 80, 200)` | ✅ Done |
+| Ground | `PlaneGeometry(500, 500)`, MeshStandard, blue-grey ocean | ✅ Done |
 
-## 9.2 World Generation (Simplified)
+## 8.2 World Generation (Implemented)
 
-### Step 1: Root Placement (Force-Directed Layout)
+### Step 1: Island Placement (Grid Layout)
 
-- **Input:** Root adjacency graph from ontology (150–200 nodes, weighted edges).
-- **Algorithm:** Simple Fruchterman-Reingold force-directed layout.
-  - Repulsion: All roots repel. `F = k_repel / distance²`. Minimum distance: ~8 world units.
-  - Attraction: Connected roots attract. `F = k_attract × distance × weight`.
-  - Iterations: 200 with simulated annealing (decreasing temperature).
-  - Runtime: <50ms for 200 nodes.
-- **Output:** `Map<rootId, {x: number, z: number}>` — 2D positions for root monuments.
-- **Fallback:** If force-directed produces overlapping clusters, switch to grid layout with semantic-field grouping.
+- **Input:** Root clusters from `ontology.json`
+- **Algorithm:** Simple grid layout. `GRID_SPACING = 25` world units between centres.
+- **Island radius:** Proportional to word count: `min(8, max(3, wordCount * 0.8 + 2))`
+- **Output:** `Island[]` with world positions
 
-### Step 2: Lexeme Placement Around Roots
+> **Not yet implemented:** Force-directed layout (Fruchterman-Reingold). Grid works for the prototype but doesn't convey semantic relationships. Planned for Phase 0.5.
 
-For each root, derived lexemes placed in concentric rings:
+### Step 2: Island Mesh Generation
 
-- Sort by frequency (highest = closest to monument).
-- Ring 1 (radius 2): top 4 lexemes.
-- Ring 2 (radius 4): next 8 lexemes.
-- Ring 3 (radius 6): remaining.
-- Angular position: deterministic from lexeme ID hash, evenly distributed.
-- Y position: on the terrain surface.
+Each island is a `THREE.Group` containing:
+1. **Base cylinder** — `CylinderGeometry(radius, radius*1.2, 2, 16)`, dark sea green, flat shading, shadows
+2. **Root label** — Canvas-based text sprite above island centre, font 48px, dark colour
+3. **Word pillars** — `BoxGeometry(0.4, 1.5, 0.4)` arranged in a circle at 60% of island radius. Each pillar stores `{ type: 'word', wort }` in `userData` for raycasting.
+4. **Word labels** — Canvas text sprites above each pillar, font 32px
 
-### Step 3: Terrain Generation
+### Step 3: Bridge Mesh Generation
 
-- `PlaneGeometry(200, 200, 100, 100)` — the ground.
-- Vertex displacement: 2D Perlin noise, amplitude 0.5, frequency 0.05. Gentle rolling hills.
-- Vertex colours: height-based lerp between dark green-brown (low) and light green (high).
-- Material: `MeshLambertMaterial({ vertexColors: true, flatShading: true })`. Low-poly aesthetic.
-- Normal recomputation: `geometry.computeVertexNormals()`.
+- `BoxGeometry(0.8, 0.3, length)` connecting island centres
+- Compound label sprite at midpoint
+- Only created between islands that share compound words
 
-### Step 4: Path Markers
+### Not Yet Implemented
 
-Between each root monument and its derived word-objects:
-- Small spheres at 0.8-unit intervals along straight lines.
-- All markers: single `InstancedMesh` (one geometry, one material, N instances). One draw call.
-
-## 9.3 3D Object Specifications
-
-All objects are low-poly, vertex-coloured, procedurally created in code (no external model files).
-
-| Object | Geometry | Visual | Vertices |
-|--------|----------|--------|----------|
-| Root Monument | `CylinderGeometry(0.3, 0.2, 2, 6)` | Hexagonal pillar. Colour by etymological depth (PIE=deep blue, PGmc=teal, OHG=brown, NHG=green). Label on top. | ~24 |
-| Noun Object | `BoxGeometry(0.4, 0.4, 0.4)` | Cube. Colour by semantic field. | ~24 |
-| Verb Object | `OctahedronGeometry(0.3, 0)` | Diamond. Gentle rotation (0.5 rad/s). Warm tones. | ~6 |
-| Adjective Object | `SphereGeometry(0.25, 4, 3)` | Low-poly sphere. Cool tones. | ~12 |
-| Adverb Object | `TetrahedronGeometry(0.25, 0)` | Tetrahedron. Muted tones. | ~4 |
-| Ground | `PlaneGeometry(200, 200, 100, 100)` | Perlin-displaced, vertex-coloured. Flat shading. | ~10,000 |
-| Path Marker | `SphereGeometry(0.05, 3, 2)` | Tiny dot. Instanced. | ~6 (instanced) |
-| Focus Point | `RingGeometry(0.3, 0.4, 16)` | Subtle glowing circle on ground. Semi-transparent. | ~32 |
-
-**Total scene budget:** ~15,000–25,000 vertices. Trivial for any WebGL device.
+| Feature | Plan | Priority |
+|---------|------|----------|
+| **POS-specific meshes** | Nouns=cubes, Verbs=diamonds, Adj=spheres, Adv=tetrahedra | Medium |
+| **Terrain displacement** | Perlin noise vertex displacement on ground plane | Low |
+| **Path markers** | Instanced small spheres between root and word objects | Low |
+| **Vertex colours** | Height-based colour lerp on terrain | Low |
 
 ---
 
-# 10. Interaction System
+# 9. Interaction System (Implemented)
 
-## 10.1 Raycasting
+## 9.1 Raycasting
 
-- On pointer down (click/touch), cast ray from camera through pointer position.
-- Test against interactable objects (word-objects + root monuments in a `THREE.Group`).
-- Test against ground plane (for click-to-walk navigation).
-- Priority: object hit takes precedence over ground hit.
+- On pointer-up, check if pointer moved < 8px from pointer-down (tap vs. drag)
+- If tap: raycast from camera through pointer position into scene
+- Walk up parent chain of hit object to find `userData.type === 'word'` or `name.startsWith('island-')`
 
-## 10.2 Object Interaction
+## 9.2 Object Interaction
 
-| Action | Effect |
-|--------|--------|
-| Hover over word-object | Subtle scale-up (1.0 → 1.15 over 100ms). Emissive increase. |
-| Click/tap word-object | Open word card (CSS2D overlay). Camera adjusts to frame object. |
-| Click/tap root monument | Open etymology view. Expanded vertical timeline display. |
-| Click/tap elsewhere | Dismiss any open card/view. |
-| Click/tap ground | Move player focus point there (navigation). |
+| Action | Effect | Status |
+|--------|--------|--------|
+| Tap word pillar | Show word info card (lemma, POS, CEFR, IPA, definition, root, compound) | ✅ Done |
+| Tap island (not a word) | Fly camera to island + show island overview card with clickable word list | ✅ Done |
+| Tap word in island card | Switch to that word's detail card | ✅ Done |
+| Tap empty space | Dismiss card | ✅ Done |
+| Press Escape | Dismiss card | ✅ Done |
+| Hover over word | Scale-up + emissive glow | ❌ Not done |
 
-## 10.3 Word Card (CSS2D Overlay)
+## 9.3 Word Card (HTML Overlay)
 
-The primary information display. Rendered as HTML/CSS via CSS2DRenderer.
+The `WordCard` class (`ui/word-card.ts`) manages a floating HTML card anchored at viewport bottom-center. Features:
 
-**Layout — four sections, revealed progressively:**
+**Word Detail View (`showWord`):**
+- Lemma in large type (1.6rem, bold)
+- POS tag (styled pill)
+- CEFR level badge (colour-coded: A1=green → C2=red)
+- IPA transcription (if available)
+- English definition
+- Compound decomposition display (if applicable)
+- Root information (form + origin language + proto-form)
 
-**Section 1: Header**
-- Lemma in large type (24px, bold). E.g. "verstehen".
-- IPA transcription (14px, grey). E.g. /fɛɐ̯ˈʃteːən/.
-- POS as coloured pill (Verb=warm orange, Noun=blue, Adj=teal).
-- CEFR badge (small, top-right). E.g. "A1".
-
-**Section 2: Morphological Decomposition**
-- Word splits into coloured segments with smooth animation (400ms).
-- Root: bold dark green (`#2D6A4F`).
-- Prefix: blue-grey (`#577590`).
-- Suffix: amber (`#CA8A04`).
-- Below each segment: type label + function. E.g. "prefix: ver- (completion)" / "root: steh- (to stand)".
-
-**Section 3: Definition**
-- Short English definition.
-- Source citation in small text (e.g. "Def: DWDS").
-
-**Section 4: Etymology Summary**
-- Compact chain: NHG ← MHG ← OHG ← PGmc ← PIE.
-- Reconstructed forms marked with *.
-- Source icons (tap → open external URL).
-- Cognates listed: "Cf. English: stand, Dutch: staan, Swedish: stå".
+**Island Overview View (`showIsland`):**
+- Root form + origin language as header
+- Proto-form and meaning if available
+- Clickable word list (each word shows lemma + CEFR badge + definition)
+- Click any word → switches to its detail view
 
 **Styling:**
-```css
---card-bg: rgba(255, 253, 247, 0.95);  /* warm parchment */
---card-border: rgba(180, 170, 150, 0.3);
---card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
---card-radius: 12px;
---text-primary: #1A1A2E;
---text-secondary: #666;
---colour-root: #2D6A4F;
---colour-prefix: #577590;
---colour-suffix: #CA8A04;
-```
+- Glassmorphism: `backdrop-filter: blur(12px)`, white background with 95% opacity
+- Box shadow, 16px border radius
+- Slide-up entry animation (250ms, ease-out)
+- Slide-down exit animation (200ms)
+- Close button (top-right `×`)
+- All styles injected via `<style>` tag on first use (no CSS file)
 
-Max width: 320px. System font stack. Scale-in animation (0.9 → 1.0 over 200ms, ease-out).
+### Not Yet Implemented
 
-## 10.4 Etymology View (Root Monument)
-
-Tapping a root monument opens an expanded timeline:
-- Full etymology chain displayed as a vertical timeline.
-- Each stage: stage label + form + meaning + source link.
-- All derived lexemes listed at the bottom with CEFR badges.
-- Cognates section.
-
-## 10.5 Source Links
-
-Every piece of information has a traceable source. Sources shown as small superscript footnotes. Tapping opens the source URL:
-
-- DWDS: `https://dwds.de/wb/[lemma]`
-- DWDS etymology: `https://dwds.de/wb/etymwb/[lemma]`
-- Wiktionary: `https://de.wiktionary.org/wiki/[lemma]`
+| Feature | Priority |
+|---------|----------|
+| Morphological decomposition with colour-coded segments (prefix=blue, root=green, suffix=amber) | **High** |
+| Etymology chain timeline view (vertical NHG → MHG → OHG → PGmc → PIE) | **High** |
+| Source citations (DWDS, Wiktionary links) | Medium |
+| Cognates section | Low |
 
 ---
 
-# 11. Search & Navigation
+# 10. Search & Navigation
 
-## 11.1 Search Bar
+## 10.1 Search Bar — Not Yet Implemented
 
-Plain HTML input, fixed at top of viewport. Hidden by default, toggled by magnifying glass icon (top-right).
+**Planned:**
+- HTML input, fixed at top of viewport, toggled by icon
+- Prefix match + umlaut transliteration (ue→ü, ae→ä, oe→ö, ss→ß)
+- Max 8 autocomplete results
+- Select result → camera flies to word → word card auto-opens
 
-**Behaviour:**
-1. User types a German word (or partial).
-2. Dropdown shows matching lemmas from ontology (prefix match + umlaut transliteration: ue→ü, ae→ä, oe→ö, ss→ß). Max 8 results.
-3. User selects a result → camera smoothly animates to that word-object (lerp over 800ms).
-4. Word card auto-opens.
-5. Search bar dismisses.
+**Dependencies:**
+- Needs an `OntologyStore` class with `searchLemma(query)` method (or a simple Map-based index)
+- Camera fly-to is already implemented (`CameraController.focusOn()`)
 
-**Implementation:**
-- OntologyStore has a `searchLemma(query)` method.
-- Camera animation: lerp focus point position to target's world coordinates.
-
----
-
-# 12. Performance Targets
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Frame rate (desktop Chrome) | 60 fps steady | Chrome DevTools Performance |
-| Frame rate (mobile Chrome, 2022 mid-range) | 30 fps steady, target 60 | Remote debugging |
-| Initial load time | < 3 seconds (ontology + scene) | Lighthouse, Network tab |
-| Ontology parse time | < 200ms | performance.now() |
-| Raycaster response | < 16ms (within frame budget) | performance.now() |
-| Memory (JS heap) | < 80MB | Chrome DevTools Memory |
-| Bundle size (gzipped) | < 300KB JS + < 800KB ontology | Vite build + gzip |
-
-## 12.1 Key Optimisations
-
-1. **Instanced rendering** for path markers (~1,000–2,000 small spheres → 1 draw call).
-2. **Frustum culling** (Three.js default — objects outside camera view not rendered).
-3. **LOD for labels:** CSS2D labels created/destroyed based on camera distance. Object pool to avoid GC.
-4. **Deferred ontology parsing:** Parse in Web Worker if available, main-thread `requestIdleCallback` fallback.
-5. **Render-on-demand:** Only re-render when dirty (camera moved, animation active, selection changed). Skip redundant frames.
-
-## 12.2 Mobile-Specific
-
-- Touch handling: distinguish pan (one-finger drag), zoom (pinch), rotate (two-finger drag), tap (start + end < 200ms, < 10px movement).
-- Pixel ratio clamped to 2.0.
-- Viewport: `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">`.
-- CSS: `100dvh` for dynamic viewport height.
-- Virtual joystick: only shown on touch devices.
+**Priority:** High — success criterion #4.
 
 ---
 
-# 13. Module Architecture
+# 11. Performance
 
-## 13.1 Module List
+## 11.1 Current Performance
 
-| Module | File(s) | Responsibility |
-|--------|---------|---------------|
-| main | `main.ts` | Entry point, orchestrate init sequence |
-| OntologyStore | `data/OntologyStore.ts` | Load, index, query ontology data |
-| SceneManager | `scene/SceneManager.ts` | Renderer, camera, lights, render loop |
-| PlayerController | `player/PlayerController.ts` | Focus point, camera follow, all input methods |
-| WorldGenerator | `world/WorldGenerator.ts` | Orchestrates world generation |
-| TerrainBuilder | `world/TerrainBuilder.ts` | Ground plane with noise displacement |
-| LayoutEngine | `world/LayoutEngine.ts` | Force-directed root placement |
-| ObjectPlacer | `world/ObjectPlacer.ts` | Place root monuments, word objects, paths |
-| EntityFactory | `entities/EntityFactory.ts` | Create 3D meshes with correct geometry/colour |
-| InteractionManager | `entities/InteractionManager.ts` | Raycasting, hover, selection, card trigger |
-| WordCard | `ui/WordCard.ts` | CSS2D word card overlay |
-| EtymologyView | `ui/EtymologyView.ts` | Etymology chain display |
-| SearchBar | `ui/SearchBar.ts` | HTML search with autocomplete |
-| NoiseGenerator | `utils/noise.ts` | Perlin/simplex noise |
-| Helpers | `utils/helpers.ts` | Math, colour, hash utilities |
+| Metric | Desktop Chrome | Mobile Chrome | Target |
+|--------|---------------|---------------|--------|
+| Frame rate | ~60 fps | ~45-60 fps | ✅ 60 / 30+ |
+| Initial load | ~1-2s | ~2-3s | ✅ < 3s |
+| Bundle size | ~517KB JS | same | ⚠️ Target was < 300KB |
+| `ontology.json` | ~400KB | same | ✅ < 800KB |
 
-## 13.2 Initialisation Sequence
+## 11.2 Known Issues
+
+1. **Bundle size (517KB)** — Three.js is the bulk. Could use code-splitting or dynamic imports for the addons. Not critical for Phase 0.
+2. **Canvas-based text sprites** — Each word creates a 512×256 canvas. For 600+ words, this is significant texture memory. Consider shared sprite sheets or CSS2DRenderer for Phase 0.5.
+3. **No render-on-demand** — Currently renders every frame even when nothing is moving. Adding a dirty flag would save battery on mobile.
+4. **No instanced rendering** — Word pillars are individual meshes. For 600+ words, instanced rendering would reduce draw calls.
+
+---
+
+# 12. Module Architecture (Actual)
+
+## 12.1 Module List
+
+| Module | File | Responsibility | Lines |
+|--------|------|---------------|-------|
+| main | `main.ts` | Entry point, orchestrate init, interaction wiring, render loop | ~210 |
+| types | `types/ontology.ts` | Wurzel, Wort, RootCluster, CompoundLink | ~50 |
+| types | `types/world.ts` | Island, Bridge, WorldLayout | ~30 |
+| loader | `data/loader.ts` | Fetch + filter `ontology.json` | ~70 |
+| mock | `data/mock.ts` | Example clusters for offline dev | ~130 |
+| renderer | `scene/renderer.ts` | WebGL renderer, camera, lights, ground, resize | ~85 |
+| layout | `world/layout.ts` | Grid layout computation | ~70 |
+| island | `world/island.ts` | Island mesh + word pillars + text sprites | ~120 |
+| bridge | `world/bridge.ts` | Bridge mesh + label | ~85 |
+| camera | `player/camera.ts` | CameraController (MapControls + WASD + fly-to) | ~150 |
+| input | `player/input.ts` | Keyboard state tracking | ~65 |
+| word-card | `ui/word-card.ts` | HTML overlay for word/island info | ~420 |
+
+**Total: ~1,500 lines of TypeScript.**
+
+## 12.2 Initialisation Sequence
 
 ```typescript
-// main.ts
-async function init() {
-  // 1. Scene infrastructure (synchronous, fast)
-  const sceneManager = new SceneManager(document.getElementById('app')!);
+async function main() {
+  // 1. Scene infrastructure (sync)
+  const ctx = createSceneContext(container);
 
-  // 2. Load ontology data (async, ~200ms–1s)
-  const store = new OntologyStore();
-  await store.load('/ontology.json');
+  // 2. Camera + input (sync)
+  const cameraCtrl = new CameraController(ctx.camera, ctx.renderer.domElement);
+  const keyboard = createKeyboardState();
+  bindKeyboard(keyboard);
 
-  // 3. Generate world from ontology (sync, ~50–200ms)
-  const worldGen = new WorldGenerator(store, sceneManager.scene);
-  const worldState = worldGen.generate();
+  // 3. UI components (sync)
+  const wordCard = new WordCard(container);
 
-  // 4. Player controller (sync, fast)
-  const player = new PlayerController(
-    sceneManager.camera,
-    sceneManager.renderer.domElement,
-    worldState.terrain
-  );
+  // 4. Load ontology data (async, ~200ms-1s)
+  const { clusters } = await loadOntology({ minClusterSize: 2, maxClusters: 200 });
 
-  // 5. Interaction manager (sync, fast)
-  const interaction = new InteractionManager(
-    sceneManager.camera,
-    sceneManager.renderer.domElement,
-    worldState,
-    store
-  );
+  // 5. Build world from clusters (sync, ~50ms)
+  const layout = computeGridLayout(clusters);
+  for (const island of layout.islands) ctx.scene.add(createIslandMesh(island));
+  for (const bridge of layout.bridges) ctx.scene.add(createBridgeMesh(bridge, islandMap));
 
-  // 6. UI setup (sync, fast)
-  const searchBar = new SearchBar(store, player);
+  // 6. Wire interactions (sync)
+  // ... raycasting, tap detection, card show/hide ...
 
   // 7. Start render loop
-  sceneManager.start((delta: number) => {
-    player.update(delta);
-    interaction.update(delta);
-  });
+  function animate() {
+    requestAnimationFrame(animate);
+    cameraCtrl.update(keyboard, ctx.clock.getDelta());
+    ctx.renderer.render(ctx.scene, ctx.camera);
+  }
+  animate();
 }
-
-init();
 ```
 
-## 13.3 Data Flow
+## 12.3 Planned Modules (Not Yet Created)
 
-```
-ontology.json
-    │
-    ▼
-OntologyStore (indexes: lemma→id, root→lexemes, adjacency graph)
-    │
-    ├──→ WorldGenerator
-    │       ├── LayoutEngine (root positions from adjacency graph)
-    │       ├── TerrainBuilder (ground plane)
-    │       └── ObjectPlacer (monuments, word objects, paths)
-    │               └── EntityFactory (mesh creation)
-    │
-    ├──→ InteractionManager
-    │       ├── Raycasting → hit detection
-    │       ├── WordCard (populated from OntologyStore)
-    │       └── EtymologyView (populated from OntologyStore)
-    │
-    ├──→ SearchBar
-    │       └── searchLemma() → camera animation via PlayerController
-    │
-    └──→ PlayerController
-            └── focus point + camera + input handling
-```
+| Module | File | Purpose |
+|--------|------|---------|
+| OntologyStore | `data/OntologyStore.ts` | Index ontology data for search + query |
+| SearchBar | `ui/SearchBar.ts` | HTML search input with autocomplete |
+| EtymologyView | `ui/EtymologyView.ts` | Etymology chain timeline display |
+| EntityFactory | `entities/EntityFactory.ts` | POS-specific mesh creation |
+| InteractionManager | `entities/InteractionManager.ts` | Extract raycasting from main.ts |
+| noise | `utils/noise.ts` | Perlin/simplex noise for terrain |
 
 ---
 
-# 14. Implementation Timeline
+# 13. Remaining Work — Priority Order
 
-Weeks are development weeks. Assumes one developer working full-time. Two developers can parallelize data + game tracks.
+## 13.1 High Priority (Complete the Prototype)
 
-## Week 1: Foundation — Dev Environment + Data Pipeline Extension
+These items are needed to satisfy the success criteria and make the prototype "feel complete."
 
-| Task | Detail | Output |
-|------|--------|--------|
-| Docker dev container | `Dockerfile.dev` + `docker-compose.yml` | `docker compose up` works |
-| Game scaffold | `game/` directory, `package.json`, `tsconfig.json`, `vite.config.ts`, blank `index.html` | `npm run dev` serves empty page |
-| Extend `schema.sql` | Add `roots`, `affixes`, `morphological_decompositions`, `root_lexeme_links`, `root_adjacency` tables | Schema ready |
-| Write `select-vocabulary.py` | Select 500 A1-A2 content words from entries table | `vocabulary_seed.json` |
-| Write `extract-etymology.py` | Parse Kaikki `etymology_templates[]` → roots + chains | `roots` table populated |
+| # | Task | Estimated Effort | Success Criterion |
+|---|------|-----------------|-------------------|
+| H1 | **Search bar** — text input, autocomplete, camera fly-to + auto-open card | 3-4h | #4 |
+| H2 | **Morphological decomposition display** — colour-coded prefix/root/suffix segments on word card | 3-4h | #2 |
+| H3 | **Etymology chain view** — vertical timeline on island card (NHG → MHG → OHG → PGmc → PIE) | 3-4h | #3 |
+| H4 | **Source citations** — DWDS + Wiktionary links on cards | 1-2h | #7 |
+| H5 | **Ontology data enrichment** — add morphological segments + etymology chains to `export-ontology.py` output | 4-6h | #2, #3 |
 
-## Week 2: Ontology Pipeline Complete + Scene Setup
+## 13.2 Medium Priority (Visual Quality + Feel)
 
-| Task | Detail | Output |
-|------|--------|--------|
-| Write `decompose-morphology.py` | Automated decomposition using Kaikki + root data | `morphological_decompositions` table |
-| Write `build-affixes.py` | Extract affix inventory | `affixes` table |
-| Write `export-ontology.py` + `validate-ontology.py` | SQLite → `ontology.json` + validation | `data/ontology.json` valid |
-| Implement `OntologyStore` | TypeScript class: fetch, parse, index, query | Ontology data queryable in browser |
-| Implement `SceneManager` | WebGL renderer, camera, lights, background, fog, render loop | Empty 3D scene running |
+These improve the experience but aren't strictly required for the success criteria.
 
-## Week 3: World Generation + Player Controller
+| # | Task | Estimated Effort |
+|---|------|-----------------|
+| M1 | **POS-specific meshes** — different shapes/colours for nouns, verbs, adjectives, adverbs | 2h |
+| M2 | **Force-directed layout** — replace grid with Fruchterman-Reingold to show semantic relationships | 3-4h |
+| M3 | **Hover effects** — scale-up + emissive glow when mouse/finger nears a word object | 1-2h |
+| M4 | **OntologyStore class** — proper indexing for search and cross-referencing | 2-3h |
+| M5 | **Extract InteractionManager** — move raycasting logic out of `main.ts` into its own module | 1-2h |
 
-| Task | Detail | Output |
-|------|--------|--------|
-| Implement `TerrainBuilder` | Perlin noise terrain with vertex colours + flat shading | Navigable ground plane |
-| Implement `LayoutEngine` | Fruchterman-Reingold force-directed layout | Root positions computed |
-| Implement `EntityFactory` | Low-poly meshes for each POS type + root monuments | 3D objects created |
-| Implement `ObjectPlacer` | Place monuments + word objects + path markers | Objects in world |
-| Implement `PlayerController` | Click-to-walk + WASD + zoom + rotate + virtual joystick | Player can move through world |
+## 13.3 Low Priority (Polish)
 
-## Week 4: Interaction + Word Card
+| # | Task | Estimated Effort |
+|---|------|-----------------|
+| L1 | **Terrain generation** — Perlin noise displacement + vertex colours | 2-3h |
+| L2 | **Path markers** — instanced small spheres between root monument and word objects | 1h |
+| L3 | **Focus point marker** — glowing ring on ground showing camera target | 30min |
+| L4 | **Render-on-demand** — skip frames when nothing is moving | 1-2h |
+| L5 | **Instanced rendering** — batch word pillars into InstancedMesh | 1-2h |
+| L6 | **Virtual joystick** — mobile on-screen joystick (if MapControls pan isn't enough) | 2h |
+| L7 | **Validate ontology** — `validate-ontology.py` with integrity checks | 2h |
+| L8 | **Code splitting** — lazy-load Three.js addons to reduce bundle size | 1h |
 
-| Task | Detail | Output |
-|------|--------|--------|
-| Implement `InteractionManager` | Raycasting, hover effects, selection | Tap objects for interaction |
-| Implement `WordCard` | CSS2D overlay with all four sections | Tap word → see morphology + etymology |
-| Implement `EtymologyView` | Expanded chain display for root monuments | Tap monument → see full history |
-| Implement `SearchBar` | HTML input, autocomplete, camera fly-to | Type word → navigate to it |
+## 13.4 Suggested Next Sprint
 
-## Week 5: Integration + Polish + Mobile
+**Sprint goal:** Make the word cards informative enough to prove the educational value.
 
-| Task | Detail | Output |
-|------|--------|--------|
-| Integration testing | All modules working together with real ontology data | Full prototype running |
-| Manual data review | Spot-check 50 entries; fix decomposition errors | Data quality verified |
-| Performance tuning | Profiling, instanced rendering, LOD for labels | Meets perf targets |
-| Mobile testing | Android Chrome, touch interactions, virtual joystick | 30+ fps on mobile |
-| Bug fixes + visual polish | Colours, spacing, card styling, animation timing | Looks good |
+1. **H5** — Enrich `export-ontology.py` to output morphological segments and etymology chains
+2. **H2** — Render colour-coded segments on word card
+3. **H3** — Render etymology timeline on island card
+4. **H1** — Search bar with autocomplete
+5. **H4** — Source citation links
+6. **M1** — POS-specific meshes (quick visual improvement)
 
-## Week 6: Final Polish + Deploy
-
-| Task | Detail | Output |
-|------|--------|--------|
-| Cross-browser testing | Desktop Chrome, Firefox; mobile Chrome | Works everywhere |
-| Build + deploy | Vite production build → static hosting | Live at public URL |
-| Data quality final pass | Fix any remaining errors from spot-check | ≤5 errors in 50-entry sample |
-| Documentation | Update README with project description + link | Repo presentable |
-
-**Total: ~6 weeks.** Critical path: ontology data pipeline (weeks 1–2) must complete before game can show real data (week 3+). Game scaffolding starts in parallel.
+After this sprint, all 9 success criteria should be met.
 
 ---
 
-# 15. Data Pipeline — Execution Sequence
+# 14. Risk Register
 
-The complete reproducible build from zero to playable game:
-
-```bash
-# ── 0. Prerequisites (inside Docker container) ──────────────
-
-# Kaikki JSONL files should already be in raw-data/kaikki/
-# FreeDict, IPA-dict, CEFR already in raw-data/
-
-# ── 1. Build dictionary database (existing pipeline) ────────
-
-python3 tools/build-db.py
-
-# Outputs: data/urwort.db with entries + forms + FTS + meta
-
-# ── 2. Select vocabulary seed ────────────────────────────────
-
-python3 tools/select-vocabulary.py
-
-# Outputs: data/vocabulary_seed.json (500 A1-A2 lexemes)
-
-# ── 3. Extract etymology chains from Kaikki ──────────────────
-
-python3 tools/extract-etymology.py
-
-# Outputs: roots + root_lexeme_links + root_adjacency tables
-
-# ── 4. Decompose morphology ──────────────────────────────────
-
-python3 tools/decompose-morphology.py
-
-# Outputs: morphological_decompositions table
-
-# ── 5. Build affix inventory ─────────────────────────────────
-
-python3 tools/build-affixes.py
-
-# Outputs: affixes table
-
-# ── 6. Export ontology JSON ──────────────────────────────────
-
-python3 tools/export-ontology.py
-
-# Outputs: data/ontology.json + game/public/ontology.json
-
-# ── 7. Validate ──────────────────────────────────────────────
-
-python3 tools/validate-ontology.py
-
-# Outputs: validation report, exit 0 if clean
-```
-
-Each script is independently runnable and idempotent. Total pipeline time: ~5–15 minutes (dominated by Kaikki parsing).
+| Risk | Severity | Likelihood | Mitigation | Status |
+|------|----------|------------|------------|--------|
+| Kaikki `etymology_templates[]` coverage too low | High | Medium | Cross-reference with `etymology_text`. Fall back to manual. Even 300 entries prove concept. | ✅ Mitigated — 82 multi-word clusters extracted |
+| Automated morphological decomposition quality too low | High | Medium | Use Kaikki `derived[]`, `literal_meaning`, known affix patterns. Manual verification for gaps. | ⚠️ Open — decomposition not yet implemented |
+| Navigation model doesn't feel like exploration | High | Low | MapControls + WASD + fly-to. Multiple tuning knobs. | ✅ Mitigated — feels spatial |
+| Force-directed layout produces ugly clusters | Medium | Medium | Grid layout for now. Force-directed later with tuning. | ✅ Mitigated — grid works |
+| Mobile performance below 30 fps | Low | Low | Scene is lightweight. MapControls battle-tested on mobile. | ✅ Mitigated — 45-60 fps on mobile |
+| Docker environment issues on different host OSes | Medium | Low | Standard base image, standard tools. | ✅ Mitigated — tested on Linux |
+| Bundle size too large for mobile | Low | Medium | Currently 517KB. Could code-split. Not critical for Phase 0. | ⚠️ Acceptable |
+| Canvas texture memory for 600+ word labels | Medium | Medium | Each word creates a 512×256 canvas texture. Consider CSS2DRenderer or sprite sheets. | ⚠️ Open |
 
 ---
 
-# 16. Risk Register
-
-| Risk | Severity | Likelihood | Mitigation |
-|------|----------|------------|------------|
-| Kaikki `etymology_templates[]` coverage too low for 500 lexemes | High | Medium | Cross-reference with `etymology_text` (free text). Fall back to manual etymology entry for gaps. Even 300 well-covered entries prove the concept. |
-| Automated morphological decomposition quality too low | High | Medium | Rely on Kaikki's `derived[]`, `literal_meaning`, and known affix patterns rather than NLP tools. Manual verification of all 500 entries (~40–60 hours). |
-| Navigation model doesn't feel like exploration | High | Low | Multiple input methods (§6). If click-to-walk doesn't feel right, tweak camera distance/speed. The hybrid approach gives many tuning knobs. |
-| Force-directed layout produces ugly overlapping clusters | Medium | Medium | Tune force parameters (repulsion strength, temperature schedule). Add minimum-distance constraint. Fallback: grid layout with semantic clustering. |
-| Mobile performance below 30 fps | Low | Low | Scene is <25K vertices. If still slow: reduce terrain resolution, disable fog, use MeshBasicMaterial. |
-| Docker environment issues on different host OSes | Medium | Low | Use standard Node 22 + Python 3 base image. Avoid host-specific mounts. Test on Linux + Mac. |
-| Manual data verification takes longer than estimated | Medium | Medium | Start with 200 entries (A1 only). Ship Phase 0 with 200 if needed. Expand to 500 in patch. |
-| TypeScript + Three.js type definitions incomplete | Low | Medium | Three.js has excellent TS types. Use `@types/three`. For custom code, start with loose types, tighten later. |
-
----
-
-# 17. Testing Strategy
-
-## 17.1 Data Validation (Automated)
-
-`validate-ontology.py` runs automated checks:
-- Every lexeme references existing roots and affixes.
-- Every etymology chain has ≥2 stages.
-- Every entry has ≥1 source citation.
-- No orphan roots.
-- All `source_ids` map to entries in the sources registry.
-- IPA strings pass basic syntax regex.
-- All root → lexeme links are bidirectional.
-
-## 17.2 Data Spot-Check (Manual)
-
-50 randomly selected lexemes (10% of dataset):
-- Morphological decomposition matches Wiktionary.
-- Etymology chain matches DWDS Pfeifer.
-- Definition is accurate and sourced.
-- CEFR level matches Goethe-Institut word list.
-- Source URLs resolve correctly.
-
-**Pass threshold:** ≤5 of 50 have errors.
-
-## 17.3 Visual / Interactive Testing (Manual)
-
-- **Desktop Chrome:** Navigate world. Tap 20+ word-objects. Verify decomposition display. Verify etymology chains. Verify source links open correct URLs. Verify search bar works.
-- **Mobile Chrome (Android):** Same. Confirm touch works. Confirm 30+ fps. Confirm word cards readable. Confirm virtual joystick works.
-- **Performance:** Record 30-second Chrome Performance trace. No frame drops below target. No long tasks or GC pauses.
-
-## 17.4 No Automated UI Tests
-
-Phase 0 does not warrant automated tests for the 3D code. The scene is simple, the interactions are few, and visual testing is faster and more appropriate. Unit tests for `OntologyStore` query methods and `LayoutEngine` placement algorithm are worthwhile; everything else is visual.
-
----
-
-# 18. Open Questions (Deferred to Phase 1+)
-
-These questions are acknowledged but explicitly not resolved in Phase 0:
+# 15. Open Questions (Deferred to Phase 1+)
 
 1. **"Peaceful respite" vs. "game" narrative tension.** Phase 0 implements both contemplation (exploration) and game mechanics (discovery + decomposition display) minimally. Phase 1 develops an overarching narrative that reconciles them.
 2. **Root granularity.** Is Licht the same root as leicht? For Phase 0, follow Wiktionary's grouping. Phase 1 adds a "synchronic transparency" score.
@@ -1156,43 +775,38 @@ These questions are acknowledged but explicitly not resolved in Phase 0:
 4. **Compound recursion depth.** Phase 0 handles one level of compounding. Recursive decomposition (Donaudampfschifffahrtsgesellschaftskapitän) is Phase 1.
 5. **Dialect variants.** Not addressed. Phase 3+.
 6. **Semantic drift.** Not modelled. Phase 1 can add meaning-evolution per etymology stage.
-7. **Graph database migration.** SQLite works for 500 lexemes. Neo4j or similar for Phase 1 (2,000+ lexemes with complex traversals).
-8. **WFC world generation.** Phase 1 replaces force-directed with Wave Function Collapse for richer terrain.
+7. **Graph database migration.** SQLite works for 600 lexemes. Neo4j or similar for Phase 1 (2,000+ lexemes with complex traversals).
+8. **WFC world generation.** Phase 1 replaces grid with Wave Function Collapse for richer terrain.
 9. **Audio integration.** Phase 1-2: pronunciation playback, ambient soundscapes.
 10. **SRS integration.** Phase 1-2: hidden spaced repetition engine driving exploration incentives.
-11. **Compound bridge walking animation.** Phase 0 shows compound decomposition on word cards. Phase 1 adds 3D bridge crossing with visual decomposition animation.
+11. **Compound bridge walking animation.** Phase 0 shows compound decomposition on word cards + flat bridges. Phase 1 adds 3D bridge crossing with visual decomposition animation.
+12. **CSS2DRenderer vs canvas sprites.** Current approach creates individual canvas textures per word label. May need to switch to CSS2DRenderer or shared sprite atlases for scale.
 
 ---
 
-# 19. Definition of Done
+# 16. Definition of Done
 
 Phase 0 is complete and ready for Phase 1 handoff when ALL of these are true:
 
-- [ ] **Ontology data:** `ontology.json` contains 500 verified lexemes with morphological decomposition, etymology chains (min 2 stages each), definitions, frequency data, CEFR annotations, and source citations.
-- [ ] **3D world:** A navigable 3D terrain with root monuments and word-objects placed according to the ontology graph.
-- [ ] **Navigation:** Hybrid click-to-walk + WASD + zoom + rotate + mobile joystick. Feels like exploration.
-- [ ] **Interaction:** Tap any word-object → word card with decomposition, definition, etymology, sources. Tap root monument → full etymology chain.
+- [x] **Docker environment:** `docker compose up` starts dev environment. No host install needed.
+- [x] **3D world:** Navigable world with root islands and word objects placed from ontology data.
+- [x] **Navigation:** MapControls pan/orbit/zoom + WASD + fly-to-island. Works on desktop and mobile.
+- [x] **Word card:** Tap word → info card with lemma, POS, CEFR, IPA, definition, root info.
+- [x] **Island card:** Tap island → overview with root info + clickable word list.
+- [x] **Real data:** 600+ words from A1-A2 vocabulary loaded from ontology.json.
+- [x] **GitHub Pages:** Live at public URL. CI/CD via GitHub Actions.
+- [x] **Performance:** 60 fps desktop, 30+ fps mobile, load < 3s.
+- [ ] **Morphological decomposition:** Colour-coded prefix/root/suffix segments on word card.
+- [ ] **Etymology chain:** Vertical timeline display (NHG → ... → PIE) on root/island view.
 - [ ] **Search:** Type a German word → camera navigates to it, word card opens.
-- [ ] **Source links:** Every word card and etymology view has clickable source citations.
-- [ ] **Performance:** 60 fps desktop Chrome, 30+ fps mobile Chrome. Load < 3 seconds.
+- [ ] **Source links:** Every word card has clickable DWDS/Wiktionary citations.
 - [ ] **Data quality:** Spot-check of 50 random entries: ≤5 errors.
-- [ ] **Docker:** `docker compose up` starts the complete dev environment.
-- [ ] **Deployed:** Live at a public URL (static build).
-- [ ] **Open source:** Repository public on GitHub. MIT (code) + CC BY-SA (data).
 
 ---
 
-# 20. Immediate Next Steps
+# Appendix A: Changelog
 
-In order of execution:
-
-1. **Scaffold Docker dev container** — `Dockerfile.dev` + `docker-compose.yml`.
-2. **Scaffold `game/` directory** — `package.json` (three, typescript, vite), `tsconfig.json`, `vite.config.ts`, blank `index.html`.
-3. **Extend `schema.sql`** with ontology tables.
-4. **Write `select-vocabulary.py`** — select 500 A1-A2 lexemes from existing DB.
-5. **Write `extract-etymology.py`** — parse Kaikki `etymology_templates[]` into roots.
-6. **Write `decompose-morphology.py`** + **`build-affixes.py`**.
-7. **Write `export-ontology.py`** + **`validate-ontology.py`**.
-8. **Run full pipeline** — produce `ontology.json`.
-9. **Implement game modules** (weeks 2–4 per timeline).
-10. **Integrate, test, polish, deploy** (weeks 5–6).
+| Date | Change |
+|------|--------|
+| 2026-03-09 | Initial plan created from game_design.md, ontology_spec.md, user clarifications |
+| 2026-03-15 | **Major update:** Added progress tracking to all sections. Updated repository structure to match actual codebase. Documented architecture divergences from original plan (simpler, fewer files). Added D18-D21 decisions. Updated navigation section to reflect MapControls implementation. Updated data pipeline section to reflect single export-ontology.py. Added "Remaining Work" section with prioritised task list. Updated Definition of Done with checkboxes. Added changelog. |
