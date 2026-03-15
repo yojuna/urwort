@@ -19,22 +19,24 @@ The current phase proves one hypothesis: **walking through a spatial representat
 ```bash
 # Prerequisites: Docker
 
-# Start the dev container
-docker compose up -d dev
-docker compose exec dev bash
+# Start the dev container and open a shell
+./dev.sh
 
-# Build ontology data
-python3 tools/build-db.py
-python3 tools/select-vocabulary.py
-python3 tools/extract-etymology.py
-python3 tools/decompose-morphology.py
-python3 tools/build-affixes.py
-python3 tools/export-ontology.py
-
-# Start the game
-cd game && npm install && npm run dev
+# Inside the container — export ontology data and start dev server
+export-ontology
+dev
 # Open http://localhost:5173
 ```
+
+### Deploy to GitHub Pages
+
+```bash
+./deploy.sh                  # export → build → push (full pipeline)
+./deploy.sh --skip-export    # use existing ontology.json
+./deploy.sh --dry-run        # build without pushing
+```
+
+See **[Dev Tooling](docs/dev_tooling.md)** for the full reference.
 
 ## Project Structure
 
@@ -43,15 +45,21 @@ urwort/
 ├── game/               # Three.js game client (TypeScript + Vite)
 ├── tools/              # Data pipeline scripts (Python)
 │   ├── build-db.py     # FreeDict + Kaikki + IPA + CEFR → SQLite
+│   ├── export-ontology.py  # DB + Kaikki → ontology.json
 │   └── schema.sql      # Database schema
 ├── api/                # FastAPI server (enrichment + ontology endpoints)
 ├── raw-data/           # Source data (gitignored, ~3GB)
 ├── data/               # Build outputs (gitignored)
+├── dev.sh              # Dev container helper (start, shell, logs)
+├── deploy.sh           # Build & deploy pipeline (export → build → push)
+├── Dockerfile.dev      # Dev container image
+├── docker-compose.yml  # Container orchestration
 └── docs/               # Design specifications
-    ├── phase0_implementation_plan.md  # Current implementation plan
-    ├── game_design.md                 # Game vision & mechanics
-    ├── ontology_spec.md               # Data model specification
-    └── knowledge_base.md              # Resource compendium
+    ├── dev_tooling.md               # Scripts, container, deployment
+    ├── phase0_implementation_plan.md
+    ├── game_design.md               # Game vision & mechanics
+    ├── ontology_spec.md             # Data model specification
+    └── knowledge_base.md            # Resource compendium
 ```
 
 ## Tech Stack
@@ -65,7 +73,8 @@ urwort/
 
 ## Documentation
 
-- **[Implementation Plan](docs/phase0_implementation_plan.md)** — Phase 0 detailed plan (start here)
+- **[Dev Tooling](docs/dev_tooling.md)** — Scripts, container setup, deployment (start here)
+- **[Implementation Plan](docs/phase0_implementation_plan.md)** — Phase 0 detailed plan
 - **[Game Design](docs/game_design.md)** — Full game vision & mechanics spec
 - **[Ontology Spec](docs/ontology_spec.md)** — Data model & entity schema
 - **[Knowledge Base](docs/knowledge_base.md)** — German language resource inventory
