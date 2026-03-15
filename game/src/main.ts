@@ -11,6 +11,7 @@ import { createIslandMesh } from '@/world/island';
 import { createBridgeMesh } from '@/world/bridge';
 import { loadOntology } from '@/data/loader';
 import { MOCK_CLUSTERS } from '@/data/mock';
+import { WordCard } from '@/ui/word-card';
 import type { Island, RootCluster } from '@/types';
 
 async function main(): Promise<void> {
@@ -27,6 +28,9 @@ async function main(): Promise<void> {
   const cameraCtrl = new CameraController(ctx.camera, ctx.renderer.domElement);
   const keyboard = createKeyboardState();
   const cleanupKeyboard = bindKeyboard(keyboard);
+
+  // --- UI ---
+  const wordCard = new WordCard(container);
 
   // --- Load ontology data ---
   let clusters: RootCluster[];
@@ -66,11 +70,11 @@ async function main(): Promise<void> {
     if (mesh) ctx.scene.add(mesh);
   }
 
-  // --- Click/tap to focus on island ---
+  // --- Click/tap interaction ---
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
-  const onPointerUp = (event: PointerEvent) => {
+  const onTap = (event: PointerEvent) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -79,33 +83,75 @@ async function main(): Promise<void> {
     raycaster.setFromCamera(pointer, ctx.camera);
     const intersects = raycaster.intersectObjects(ctx.scene.children, true);
 
+    // If nothing hit, dismiss the card
+    if (intersects.length === 0) {
+      wordCard.hide();
+      return;
+    }
+
     for (const hit of intersects) {
       let obj: THREE.Object3D | null = hit.object;
       while (obj) {
+        // --- Tapped a word pillar ---
         if (obj.userData?.type === 'word') {
           const wort = obj.userData.wort;
-          console.log(`[Urwort] Tapped word: ${wort.lemma} (${wort.definition_en})`);
-          break;
+
+          // Find which island/cluster this word belongs to
+          let parentIsland: Island | undefined;
+          let parentGroup = obj.parent;
+          while (parentGroup) {
+            if (parentGroup.name?.startsWith('island-')) {
+              parentIsland = islandMap.get(parentGroup.name.replace('island-', ''));
+              break;
+            }
+            parentGroup = parentGroup.parent;
+          }
+
+          const cluster = parentIsland?.cluster;
+          const compound = cluster?.compounds.find(c => c.compound_wort_id === wort.id);
+
+          wordCard.showWord(wort, cluster?.wurzel, compound);
+          return;
         }
+
+        // --- Tapped an island (not a specific word) ---
         if (obj.name?.startsWith('island-')) {
           const islandId = obj.name.replace('island-', '');
           const island = islandMap.get(islandId);
           if (island) {
-            console.log(`[Urwort] Flying to island: ${island.cluster.wurzel.form}`);
+            // Fly camera to island
             cameraCtrl.focusOn(
               new THREE.Vector3(island.position.x, 0, island.position.z),
             );
+
+            // Show island info card with word list
+            wordCard.showIsland(
+              island.cluster.wurzel,
+              island.cluster.words,
+              island.cluster.compounds,
+              // When a word in the list is tapped, show that word's detail
+              (wort) => {
+                const compound = island.cluster.compounds.find(
+                  c => c.compound_wort_id === wort.id,
+                );
+                wordCard.showWord(wort, island.cluster.wurzel, compound);
+              },
+            );
           }
-          break;
+          return;
         }
+
         obj = obj.parent;
       }
     }
+
+    // Hit something but not a word or island — dismiss
+    wordCard.hide();
   };
 
   // Distinguish taps from drags
   let pointerDownPos = { x: 0, y: 0 };
-  const TAP_THRESHOLD = 5;
+  const TAP_THRESHOLD = 8; // pixels
 
   ctx.renderer.domElement.addEventListener('pointerdown', (e: PointerEvent) => {
     pointerDownPos = { x: e.clientX, y: e.clientY };
@@ -115,8 +161,13 @@ async function main(): Promise<void> {
     const dx = e.clientX - pointerDownPos.x;
     const dy = e.clientY - pointerDownPos.y;
     if (Math.sqrt(dx * dx + dy * dy) < TAP_THRESHOLD) {
-      onPointerUp(e);
+      onTap(e);
     }
+  });
+
+  // Dismiss card on Escape
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.code === 'Escape') wordCard.hide();
   });
 
   // --- Hide loading screen ---
@@ -142,7 +193,10 @@ async function main(): Promise<void> {
     `[Urwort] Scene ready — ${layout.islands.length} islands, ${layout.bridges.length} bridges`,
   );
   console.log(
-    `[Urwort] Controls: drag=pan, right-drag/2-finger=orbit, scroll/pinch=zoom, WASD=move, tap island=fly to`,
+    '[Urwort] Controls: drag=pan, right-drag/2-finger=orbit, scroll/pinch=zoom, WASD=move',
+  );
+  console.log(
+    '[Urwort] Tap island=fly to + show words, tap word pillar=show details, Esc=dismiss',
   );
 }
 
