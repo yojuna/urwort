@@ -91,14 +91,30 @@ const STYLES = `
 
 /* ── Morphological segments ──────────────────────────────────── */
 .urwort-segments {
-  display: flex; gap: 4px; flex-wrap: wrap;
+  display: flex; gap: 0px; flex-wrap: wrap;
   margin: 10px 0;
+  animation: urwort-seg-split 0.4s ease-out 0.1s forwards;
+}
+@keyframes urwort-seg-split {
+  from { gap: 0px; }
+  to   { gap: 6px; }
 }
 .urwort-seg {
   display: flex; flex-direction: column; align-items: center;
   border-radius: 6px; padding: 4px 10px 5px;
   font-size: 0.9rem; font-weight: 600; color: white;
   cursor: default;
+  opacity: 0; transform: translateY(4px);
+  animation: urwort-seg-appear 0.3s ease-out forwards;
+}
+.urwort-seg:nth-child(1) { animation-delay: 0.05s; }
+.urwort-seg:nth-child(2) { animation-delay: 0.1s; }
+.urwort-seg:nth-child(3) { animation-delay: 0.15s; }
+.urwort-seg:nth-child(4) { animation-delay: 0.2s; }
+.urwort-seg:nth-child(5) { animation-delay: 0.25s; }
+.urwort-seg:nth-child(6) { animation-delay: 0.3s; }
+@keyframes urwort-seg-appear {
+  to { opacity: 1; transform: translateY(0); }
 }
 .urwort-seg-label {
   font-size: 0.6rem; font-weight: 500; opacity: 0.85;

@@ -1053,6 +1053,19 @@ def main():
     conn.execute("PRAGMA cache_size   = -64000")   # 64 MB page cache
     conn.execute("PRAGMA temp_store   = MEMORY")
 
+    # Register custom SQL function used by Kaikki upsert to merge source provenance
+    def _json_patch(existing, new):
+        """Merge two JSON objects (existing ∪ new). Used in ON CONFLICT UPDATE."""
+        try:
+            base = json.loads(existing) if existing else {}
+            patch = json.loads(new) if new else {}
+            base.update(patch)
+            return json.dumps(base, ensure_ascii=False)
+        except (json.JSONDecodeError, TypeError):
+            return new or existing
+
+    conn.create_function("json_patch", 2, _json_patch)
+
     # Apply schema
     with open(SCHEMA_PATH, encoding="utf-8") as f:
         schema_sql = f.read()

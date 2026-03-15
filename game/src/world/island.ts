@@ -9,8 +9,11 @@ const ISLAND_COLOR = 0x8FBC8F;  // Dark sea green
 const ISLAND_HEIGHT = 2;
 
 /**
- * Creates a simple cylindrical island mesh for a root cluster.
- * Phase 0: basic geometry, no procedural detail yet.
+ * Creates an island mesh for a root cluster.
+ *
+ * Phase 0: cylindrical base + root label + word labels.
+ * Word *pillars* are now rendered via InstancedPillars (R2), not here.
+ * Labels remain on the island group so they move with the group.
  */
 export function createIslandMesh(island: Island): THREE.Group {
   const group = new THREE.Group();
@@ -35,7 +38,7 @@ export function createIslandMesh(island: Island): THREE.Group {
   base.receiveShadow = true;
   group.add(base);
 
-  // Root label — simple sprite for now
+  // Root label — simple sprite
   const label = createTextSprite(
     island.cluster.wurzel.form,
     { fontSize: 48, color: '#1A1A2E' },
@@ -44,35 +47,22 @@ export function createIslandMesh(island: Island): THREE.Group {
   label.scale.set(4, 2, 1);
   group.add(label);
 
-  // Word markers — small pillars around the island
+  // Word labels (sprites) — positioned where pillars would be.
+  // The actual pillar meshes are in InstancedPillars (one draw call per POS).
   const wordCount = island.cluster.words.length;
   island.cluster.words.forEach((wort, i) => {
     const angle = (i / wordCount) * Math.PI * 2;
     const r = island.radius * 0.6;
 
-    const pillarGeo = new THREE.BoxGeometry(0.4, 1.5, 0.4);
-    const pillarMat = new THREE.MeshStandardMaterial({
-      color: 0xD4A574,
-      roughness: 0.7,
-      flatShading: true,
-    });
-    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-    pillar.position.set(
-      Math.cos(angle) * r,
-      ISLAND_HEIGHT + 0.75,
-      Math.sin(angle) * r,
-    );
-    pillar.castShadow = true;
-    pillar.userData = { type: 'word', wort };
-    group.add(pillar);
-
-    // Word label
     const wordLabel = createTextSprite(wort.lemma, {
       fontSize: 32,
       color: '#2D6A4F',
     });
-    wordLabel.position.copy(pillar.position);
-    wordLabel.position.y += 1.5;
+    wordLabel.position.set(
+      Math.cos(angle) * r,
+      ISLAND_HEIGHT + 0.75 + 1.5, // pillar height + offset
+      Math.sin(angle) * r,
+    );
     wordLabel.scale.set(3, 1.5, 1);
     group.add(wordLabel);
   });

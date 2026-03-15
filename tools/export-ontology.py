@@ -18,6 +18,7 @@ import os
 import re
 import sqlite3
 import sys
+import time
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
@@ -751,6 +752,49 @@ def resolve_compound_links(clusters: list[dict]) -> list[dict]:
 # Validation
 # ---------------------------------------------------------------------------
 
+def validate_output(clusters: list[dict]) -> list[str]:
+    """Strict validation of output data. Returns list of error messages."""
+    errors: list[str] = []
+    wurzel_ids: set[str] = set()
+    wort_ids: set[str] = set()
+
+    # Pass 1: collect all IDs + check uniqueness and required fields
+    for c in clusters:
+        wid = c["wurzel"]["id"]
+        if wid in wurzel_ids:
+            errors.append(f"Duplicate wurzel ID: {wid}")
+        wurzel_ids.add(wid)
+
+        for w in c["words"]:
+            if w["id"] in wort_ids:
+                errors.append(f"Duplicate wort ID: {w['id']}")
+            wort_ids.add(w["id"])
+
+            if not w.get("source_urls"):
+                errors.append(f"Missing source_urls: {w['id']}")
+            if not w.get("definition_en"):
+                errors.append(f"Empty definition_en: {w['id']}")
+
+    # Pass 2: validate references (all IDs are now known)
+    for c in clusters:
+        wid = c["wurzel"]["id"]
+
+        for link in c.get("links", []):
+            if link["wurzel_id"] != wid:
+                errors.append(f"Link references wrong wurzel: {link}")
+            if link["wort_id"] not in wort_ids:
+                errors.append(f"Link references unknown wort: {link['wort_id']}")
+
+        for comp in c.get("compounds", []):
+            if comp["compound_wort_id"] not in wort_ids:
+                errors.append(f"Duplicate compound_wort_id not found: {comp['compound_wort_id']}")
+            for cid in comp.get("component_wort_ids", []):
+                if cid and cid not in wort_ids:
+                    errors.append(f"Link compound component unknown: {cid}")
+
+    return errors
+
+
 def validate_and_print_stats(clusters: list[dict]) -> None:
     """Print quality stats and flag potential issues."""
     total_words    = sum(len(c["words"]) for c in clusters)
@@ -795,6 +839,266 @@ def validate_and_print_stats(clusters: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Graph table population
+# ---------------------------------------------------------------------------
+
+def populate_graph_tables(db_path: str, clusters: list[dict]) -> dict:
+    """
+    Write ontology graph to SQLite edge tables.
+    Idempotent — clears and rebuilds all graph tables on each run.
+    Returns stats dict for logging.
+    """
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA foreign_keys = OFF")  # Bulk insert performance
+    cur = conn.cursor()
+    ts = int(time.time() * 1000)
+
+    stats = {
+        "roots": 0, "affixes": 0, "decompositions": 0,
+        "etymology_edges": 0, "derivation_edges": 0,
+        "compound_edges": 0, "semantic_edges": 0,
+        "semantic_fields": 0, "entry_fields": 0,
+    }
+
+    # Clear previous graph data (idempotent rebuild)
+    for table in ["entry_fields", "semantic_fields", "semantic_edges",
+                   "compound_edges", "derivation_edges", "decompositions",
+                   "etymology_edges", "affixes", "roots", "spatial_layout"]:
+        cur.execute(f"DELETE FROM {table}")
+
+    seen_roots: set[str] = set()
+    seen_affixes: set[str] = set()
+
+    # Known separable / inseparable verbal prefixes
+    sep_list = {"ab", "an", "auf", "aus", "bei", "durch", "ein", "mit",
+                "nach", "über", "um", "unter", "vor", "weg", "zu", "zurück"}
+    insep_list = {"be", "emp", "ent", "er", "ge", "miss", "ver", "zer", "hinter"}
+
+    for cluster in clusters:
+        wurzel = cluster["wurzel"]
+        chain = wurzel.get("etymology_chain", [])
+
+        # ── 1. Roots from etymology chain ──
+        # Chain is oldest-first. We insert roots and edges as we go.
+        # Edge direction: from (newer/descendant) → to (older/ancestor).
+        prev_root_id = None
+        for stage in chain:
+            root_id = f"{stage['stage']}:{stage['form']}"
+            if root_id not in seen_roots:
+                cur.execute("""
+                    INSERT OR IGNORE INTO roots
+                    (id, form, stage, core_meaning, is_reconstructed, sources, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, '{}', ?, ?)
+                """, (root_id, stage["form"], stage["stage"],
+                      wurzel.get("meaning_en", ""),
+                      1 if stage.get("is_reconstructed") else 0, ts, ts))
+                seen_roots.add(root_id)
+                stats["roots"] += 1
+
+            # ── 2. Etymology edge (newer → older) ──
+            # prev_root_id is older, root_id is newer in the chain (oldest-first order),
+            # so the edge goes: root_id (newer) → prev_root_id (older)
+            if prev_root_id and prev_root_id != root_id:
+                borrowing = wurzel.get("borrowing_info")
+                edge_type = "borrowed_from" if (
+                    borrowing and prev_root_id.startswith(borrowing.get("lang_code", "") + ":")
+                ) else "descends_from"
+                cur.execute("""
+                    INSERT OR IGNORE INTO etymology_edges
+                    (from_root_id, to_root_id, edge_type, sources)
+                    VALUES (?, ?, ?, '{}')
+                """, (root_id, prev_root_id, edge_type))
+                stats["etymology_edges"] += 1
+
+            prev_root_id = root_id
+
+        # ── Cognate edges ──
+        nhg_root_id = f"nhg:{wurzel['form']}" if chain else None
+        for cog in wurzel.get("cognates", []):
+            cog_id = f"cog:{cog['language'].lower()}:{cog['form']}"
+            if cog_id not in seen_roots:
+                cur.execute("""
+                    INSERT OR IGNORE INTO roots
+                    (id, form, stage, core_meaning, is_reconstructed, sources, created_at, updated_at)
+                    VALUES (?, ?, ?, '', 0, '{}', ?, ?)
+                """, (cog_id, cog["form"], f"cog_{cog['language'].lower()}", ts, ts))
+                seen_roots.add(cog_id)
+            if nhg_root_id:
+                cur.execute("""
+                    INSERT OR IGNORE INTO etymology_edges
+                    (from_root_id, to_root_id, edge_type, sources)
+                    VALUES (?, ?, 'cognate_of', '{}')
+                """, (nhg_root_id, cog_id))
+
+        # ── 3-5. Decompositions + derivation edges + affixes ──
+        for word in cluster["words"]:
+            segments = word.get("segments")
+            if not segments:
+                continue
+
+            # Infer word_formation_type
+            types = [s["type"] for s in segments]
+            if "prefix" in types and "suffix" in types:
+                wf_type = "circumfixation" if len(segments) == 3 else "prefixation+suffixation"
+            elif "prefix" in types:
+                wf_type = "prefixation"
+            elif "suffix" in types:
+                wf_type = "suffixation"
+            else:
+                wf_type = "simplex"
+
+            is_compound = 1 if any(
+                c["compound_wort_id"] == word["id"]
+                for c in cluster.get("compounds", [])
+            ) else 0
+
+            cur.execute("""
+                INSERT OR IGNORE INTO decompositions
+                (entry_id, segments, word_formation_type, is_compound, verified, sources, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 0, '{}', ?, ?)
+            """, (word["id"], json.dumps(segments), wf_type, is_compound, ts, ts))
+            stats["decompositions"] += 1
+
+            for i, seg in enumerate(segments):
+                if seg["type"] == "root":
+                    target_id = f"nhg:{seg['form']}"
+                    target_type = "root"
+                elif seg["type"] in ("prefix", "suffix"):
+                    target_id = f"{seg['type']}:{seg['form']}"
+                    target_type = "affix"
+                    # Ensure affix exists
+                    if target_id not in seen_affixes:
+                        separable = None
+                        if seg["type"] == "prefix":
+                            if seg["form"] in sep_list:
+                                separable = 1
+                            elif seg["form"] in insep_list:
+                                separable = 0
+                        cur.execute("""
+                            INSERT OR IGNORE INTO affixes
+                            (id, form, position, separable, sources, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, '{}', ?, ?)
+                        """, (target_id, seg["form"], seg["type"], separable, ts, ts))
+                        seen_affixes.add(target_id)
+                        stats["affixes"] += 1
+                else:
+                    continue
+
+                # Ensure root exists for derivation edge
+                if target_type == "root" and target_id not in seen_roots:
+                    cur.execute("""
+                        INSERT OR IGNORE INTO roots
+                        (id, form, stage, core_meaning, is_reconstructed, sources, created_at, updated_at)
+                        VALUES (?, ?, 'nhg', '', 0, '{}', ?, ?)
+                    """, (target_id, seg["form"], ts, ts))
+                    seen_roots.add(target_id)
+
+                cur.execute("""
+                    INSERT OR IGNORE INTO derivation_edges
+                    (entry_id, target_id, target_type, position, sources)
+                    VALUES (?, ?, ?, ?, '{}')
+                """, (word["id"], target_id, target_type, i))
+                stats["derivation_edges"] += 1
+
+        # ── 6. Compound edges ──
+        for compound in cluster.get("compounds", []):
+            for i, comp_id in enumerate(compound.get("component_wort_ids", [])):
+                if comp_id:
+                    cur.execute("""
+                        INSERT OR IGNORE INTO compound_edges
+                        (compound_entry_id, component_entry_id, position, sources)
+                        VALUES (?, ?, ?, '{}')
+                    """, (compound["compound_wort_id"], comp_id, i))
+                    stats["compound_edges"] += 1
+
+    # ── 7. Semantic edges (from entries table) ──
+    all_entry_ids: set[str] = set()
+    lemma_to_id: dict[str, str] = {}
+    for row in conn.execute("SELECT id, lemma FROM entries"):
+        all_entry_ids.add(row[0])
+        lemma_to_id[row[1]] = row[0]
+
+    for rel_type, column, edge_type in [
+        ("synonyms", "synonyms", "synonym_of"),
+        ("antonyms", "antonyms", "antonym_of"),
+        ("hypernyms", "hypernyms", "hypernym_of"),
+        ("hyponyms", "hyponyms", "hyponym_of"),
+    ]:
+        try:
+            rows = conn.execute(
+                f"SELECT id, {column} FROM entries WHERE json_array_length({column}) > 0"
+            ).fetchall()
+        except Exception:
+            continue
+        for entry_id, json_str in rows:
+            if entry_id not in all_entry_ids:
+                continue
+            try:
+                related = json.loads(json_str)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            for lemma in related[:10]:  # cap to avoid explosion
+                target_id = lemma_to_id.get(lemma)
+                if target_id and target_id != entry_id:
+                    cur.execute("""
+                        INSERT OR IGNORE INTO semantic_edges
+                        (from_entry_id, to_entry_id, edge_type, sources)
+                        VALUES (?, ?, ?, '{}')
+                    """, (entry_id, target_id, edge_type))
+                    stats["semantic_edges"] += 1
+
+    # ── 8. Semantic fields (from entries.subject_domains) ──
+    seen_fields: set[str] = set()
+    try:
+        rows = conn.execute(
+            "SELECT id, subject_domains FROM entries WHERE json_array_length(subject_domains) > 0"
+        ).fetchall()
+    except Exception:
+        rows = []
+    for entry_id, json_str in rows:
+        try:
+            domains = json.loads(json_str)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for domain in domains[:5]:
+            field_id = f"field:{domain.lower().replace(' ', '_')}"
+            if field_id not in seen_fields:
+                cur.execute("""
+                    INSERT OR IGNORE INTO semantic_fields (id, name_en, sources)
+                    VALUES (?, ?, '{}')
+                """, (field_id, domain))
+                seen_fields.add(field_id)
+                stats["semantic_fields"] += 1
+            cur.execute("""
+                INSERT OR IGNORE INTO entry_fields (entry_id, field_id)
+                VALUES (?, ?)
+            """, (entry_id, field_id))
+            stats["entry_fields"] += 1
+
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.commit()
+    conn.close()
+
+    return stats
+
+
+def print_graph_stats(db_path: str) -> None:
+    """Print row counts for all graph tables."""
+    conn = sqlite3.connect(db_path)
+    tables = ["roots", "affixes", "decompositions", "etymology_edges",
+              "derivation_edges", "compound_edges", "semantic_edges",
+              "semantic_fields", "entry_fields"]
+    print(f"\n{'─'*55}")
+    print("  Graph tables:")
+    for t in tables:
+        count = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+        print(f"    {t:25s}: {count:,}")
+    print(f"{'─'*55}")
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -806,6 +1110,8 @@ def main() -> None:
                         help="Path to raw-data directory")
     parser.add_argument("--out",      default="game/public/ontology.json",
                         help="Output JSON path")
+    parser.add_argument("--min-cluster-size", type=int, default=1,
+                        help="Minimum words per cluster in output (default 1, use 2 for production)")
     args = parser.parse_args()
 
     base_dir     = Path(__file__).resolve().parent.parent
@@ -824,6 +1130,41 @@ def main() -> None:
     clusters = resolve_compound_links(clusters)
 
     validate_and_print_stats(clusters)
+
+    # Strict validation — fail the build on hard errors
+    validation_errors = validate_output(clusters)
+    hard_errors = [e for e in validation_errors if e.startswith("Duplicate") or e.startswith("Link")]
+    soft_warnings = [e for e in validation_errors if e not in hard_errors]
+
+    if soft_warnings:
+        print(f"\n[ontology] ⚠ {len(soft_warnings)} warning(s):")
+        for w in soft_warnings[:10]:
+            print(f"  - {w}")
+        if len(soft_warnings) > 10:
+            print(f"  ... and {len(soft_warnings) - 10} more")
+
+    if hard_errors:
+        print(f"\n[ontology] ✗ {len(hard_errors)} hard error(s) — aborting:")
+        for e in hard_errors[:20]:
+            print(f"  - {e}")
+        sys.exit(1)
+
+    if not validation_errors:
+        print(f"\n[ontology] ✓ Validation passed — no issues found")
+
+    # Populate graph tables (idempotent — clears and rebuilds)
+    graph_stats = populate_graph_tables(str(db_path), clusters)
+    print(f"\n[ontology] Graph tables populated:")
+    for table, count in graph_stats.items():
+        print(f"  {table}: {count:,}")
+    print_graph_stats(str(db_path))
+
+    # Apply minimum cluster size filter
+    if args.min_cluster_size > 1:
+        before = len(clusters)
+        clusters = [c for c in clusters if len(c["words"]) >= args.min_cluster_size]
+        print(f"[ontology] Filtered: {before} → {len(clusters)} clusters "
+              f"(min size {args.min_cluster_size})")
 
     multi_word = [c for c in clusters if len(c["words"]) >= 2]
 

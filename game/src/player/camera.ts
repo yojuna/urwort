@@ -84,9 +84,11 @@ export class CameraController {
   /**
    * Called every frame from the render loop.
    * Applies WASD movement and updates MapControls.
+   * Returns true if camera moved (for render-on-demand dirty flag).
    */
-  update(keyboard: KeyboardState, deltaTime: number): void {
+  update(keyboard: KeyboardState, deltaTime: number): boolean {
     const camera = this.controls.object as THREE.PerspectiveCamera;
+    let moved = false;
 
     // --- WASD movement: translate the target on the XZ plane ---
     const hasMovement =
@@ -94,20 +96,17 @@ export class CameraController {
       keyboard.left || keyboard.right;
 
     if (hasMovement) {
-      // Get camera's forward direction projected onto XZ
       camera.getWorldDirection(_forward);
       _forward.y = 0;
       _forward.normalize();
-
-      // Right vector
       _right.crossVectors(_forward, camera.up).normalize();
 
       const speed = MOVE_SPEED * deltaTime;
-
       if (keyboard.forward)  this.controls.target.addScaledVector(_forward, speed);
       if (keyboard.backward) this.controls.target.addScaledVector(_forward, -speed);
       if (keyboard.left)     this.controls.target.addScaledVector(_right, -speed);
       if (keyboard.right)    this.controls.target.addScaledVector(_right, speed);
+      moved = true;
     }
 
     // --- Fly-to animation ---
@@ -116,14 +115,14 @@ export class CameraController {
       if (this.flyProgress >= 1) {
         this.flyProgress = 1;
       }
-
-      // Ease-out cubic
       const t = 1 - Math.pow(1 - this.flyProgress, 3);
       this.controls.target.lerpVectors(this.flyFrom, this.flyTo, t);
+      moved = true;
     }
 
     // Let MapControls apply damping, pointer state, etc.
     this.controls.update(deltaTime);
+    return moved;
   }
 
   /**

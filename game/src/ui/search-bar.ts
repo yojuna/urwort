@@ -2,102 +2,13 @@
  * SearchBar — floating input in the top-right corner.
  *
  * Features:
- *  - Real-time fuzzy matching on lemma, definition_en, morphological root
- *  - Umlaut transliteration: ae→ä, oe→ö, ue→ü, ss→ß (and their inverses)
+ *  - Real-time fuzzy matching delegated to OntologyStore
  *  - Keyboard: Enter selects first result, Escape closes
  *  - Emits a "select" callback with the matched { wort, cluster }
  */
-import type { Wort, RootCluster } from '@/types';
-
-export interface SearchResult {
-  wort: Wort;
-  cluster: RootCluster;
-  score: number;
-}
+import type { OntologyStore, SearchResult } from '../data/OntologyStore';
 
 type SelectCallback = (result: SearchResult) => void;
-
-// ---------------------------------------------------------------------------
-// Umlaut normalisation
-// ---------------------------------------------------------------------------
-
-/** Transliterate ASCII digraph approximations to their canonical German chars */
-function normaliseQuery(q: string): string {
-  return q
-    .toLowerCase()
-    .replace(/ae/g, 'ä')
-    .replace(/oe/g, 'ö')
-    .replace(/ue/g, 'ü')
-    .replace(/ss/g, 'ß');
-}
-
-/** Also strip umlauts for ASCII-only comparison */
-function stripped(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/ß/g, 'ss');
-}
-
-// ---------------------------------------------------------------------------
-// Search logic
-// ---------------------------------------------------------------------------
-
-function scoreMatch(query: string, wort: Wort): number {
-  const q   = normaliseQuery(query);
-  const qs  = stripped(query);
-  const lq  = q.toLowerCase();
-  const lqs = qs.toLowerCase();
-
-  let score = 0;
-  const lemma   = wort.lemma.toLowerCase();
-  const lemmaSt = stripped(wort.lemma);
-
-  // Exact match
-  if (lemma === lq || lemmaSt === lqs)           return 1000;
-  // Starts with
-  if (lemma.startsWith(lq) || lemmaSt.startsWith(lqs)) score += 200;
-  // Contains
-  if (lemma.includes(lq) || lemmaSt.includes(lqs)) score += 100;
-  // Fuzzy: each query char present in order
-  if (score === 0) {
-    let j = 0;
-    for (const ch of lq) {
-      const idx = lemma.indexOf(ch, j);
-      if (idx !== -1) { score += 1; j = idx + 1; }
-    }
-  }
-
-  // Bonus for definition match
-  const def = (wort.definition_en || '').toLowerCase();
-  if (def.includes(lq) || def.includes(lqs)) score += 20;
-
-  return score;
-}
-
-export function searchClusters(
-  query: string,
-  clusters: RootCluster[],
-  maxResults = 8,
-): SearchResult[] {
-  if (!query.trim()) return [];
-
-  const results: SearchResult[] = [];
-
-  for (const cluster of clusters) {
-    for (const wort of cluster.words) {
-      const score = scoreMatch(query, wort);
-      if (score > 0) {
-        results.push({ wort, cluster, score });
-      }
-    }
-  }
-
-  results.sort((a, b) => b.score - a.score);
-  return results.slice(0, maxResults);
-}
 
 // ---------------------------------------------------------------------------
 // DOM component
@@ -180,12 +91,13 @@ export class SearchBar {
   private wrapper: HTMLElement;
   private input: HTMLInputElement;
   private resultsList: HTMLElement | null = null;
-  private clusters: RootCluster[] = [];
+  private store: OntologyStore;
   private onSelect: SelectCallback;
   private selectedIdx = 0;
   private currentResults: SearchResult[] = [];
 
-  constructor(container: HTMLElement, onSelect: SelectCallback) {
+  constructor(container: HTMLElement, store: OntologyStore, onSelect: SelectCallback) {
+    this.store = store;
     this.onSelect = onSelect;
 
     // Inject styles once
@@ -217,10 +129,6 @@ export class SearchBar {
     this.bindEvents();
   }
 
-  setClusters(clusters: RootCluster[]): void {
-    this.clusters = clusters;
-  }
-
   private bindEvents(): void {
     this.input.addEventListener('input', () => this.onInput());
     this.input.addEventListener('keydown', (e) => this.onKey(e));
@@ -238,7 +146,7 @@ export class SearchBar {
   private onInput(): void {
     const q = this.input.value.trim();
     if (!q) { this.clearResults(); return; }
-    this.currentResults = searchClusters(q, this.clusters);
+    this.currentResults = this.store.searchLemma(q);
     this.selectedIdx = 0;
     this.renderResults();
   }
@@ -266,7 +174,6 @@ export class SearchBar {
   }
 
   private renderResults(): void {
-    // Remove old results DOM (but keep currentResults — they were just set by onInput)
     if (this.resultsList) {
       this.resultsList.remove();
       this.resultsList = null;

@@ -1,0 +1,53 @@
+# Urwort — Data Source Manifest
+# All raw data sources used to build urwort.db and ontology.json.
+# Enables anyone to reproduce the build from scratch.
+
+sources:
+
+  freedict:
+    name: FreeDict German-English
+    url: https://freedict.org/
+    files:
+      - raw-data/freedict/deu-eng/deu-eng.idx.gz
+      - raw-data/freedict/deu-eng/deu-eng.dict.dz
+    format: StarDict (gzipped index + dictzip dictionary)
+    license: GPL-3.0
+    provides: base entries, translations, examples
+
+  kaikki:
+    name: Kaikki.org German Wiktionary Extract
+    url: https://kaikki.org/dictionary/German/
+    files:
+      - raw-data/kaikki/kaikki.org-dictionary-German-by-pos-noun.jsonl
+      - raw-data/kaikki/kaikki.org-dictionary-German-by-pos-verb.jsonl
+      - raw-data/kaikki/kaikki.org-dictionary-German-by-pos-adj.jsonl
+    format: JSONL (one JSON object per line)
+    license: CC BY-SA 3.0 (Wiktionary)
+    provides: >
+      senses/glosses, etymology_templates, inflections, synonyms,
+      antonyms, hypernyms, hyponyms, derived forms, pronunciation,
+      subject domains, usage labels
+
+  ipa_dict:
+    name: IPA Dict - German
+    url: https://github.com/open-dict-data/ipa-dict
+    files:
+      - raw-data/ipa-dict/de.tsv
+    format: TSV (word, IPA)
+    license: MIT
+    provides: IPA pronunciation (supplements Kaikki IPA)
+
+  cefr:
+    name: CEFR Word Lists - German
+    url: https://github.com/lschmelzeisen/cefr-word-lists
+    files:
+      - raw-data/cefr/de.tsv
+    format: TSV (word, level)
+    license: CC BY 4.0
+    provides: A1/A2/B1/B2/C1/C2 level tags
+
+build:
+  tool: tools/build-db.py
+  output: data/urwort.db
+  export: tools/export-ontology.py
+  schema: tools/schema.sql
