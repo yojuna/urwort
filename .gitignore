@@ -8,10 +8,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Docker
+# Environment
 .env
 
-# Python (for future tools/ data pipeline)
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -20,90 +20,26 @@ venv/
 dist/
 build/
 
-# Raw source data — large downloaded files, not committed
+# Node.js (game client)
+node_modules/
+game/node_modules/
+
+# Raw source data — large downloaded files
+# Regenerate with: tools/download-sources.sh (future)
 raw-data/
 
-# Generated dictionary data chunks — large files, not committed.
-# Regenerate locally with: python3 tools/build-dict.py
-#
-# v2 structure:
-#   src/data/{dir}/index/*.json  — slim chunks for seeding (only h.json committed as sample)
-#   src/data/{dir}/data/*.json   — full chunks for lazy loading (all ignored)
-
-# Ignore all data/ subdirectories (full chunks, ~45MB per direction)
-src/data/de-en/data/
-src/data/en-de/data/
-
-# Ignore all index chunks except sample h.json (for testing)
-src/data/de-en/index/a.json
-src/data/de-en/index/b.json
-src/data/de-en/index/c.json
-src/data/de-en/index/d.json
-src/data/de-en/index/e.json
-src/data/de-en/index/f.json
-src/data/de-en/index/g.json
-src/data/de-en/index/i.json
-src/data/de-en/index/j.json
-src/data/de-en/index/k.json
-src/data/de-en/index/l.json
-src/data/de-en/index/m.json
-src/data/de-en/index/misc.json
-src/data/de-en/index/n.json
-src/data/de-en/index/o.json
-src/data/de-en/index/p.json
-src/data/de-en/index/q.json
-src/data/de-en/index/r.json
-src/data/de-en/index/s.json
-src/data/de-en/index/t.json
-src/data/de-en/index/u.json
-src/data/de-en/index/v.json
-src/data/de-en/index/w.json
-src/data/de-en/index/x.json
-src/data/de-en/index/y.json
-src/data/de-en/index/z.json
-src/data/en-de/index/a.json
-src/data/en-de/index/b.json
-src/data/en-de/index/c.json
-src/data/en-de/index/d.json
-src/data/en-de/index/e.json
-src/data/en-de/index/f.json
-src/data/en-de/index/g.json
-src/data/en-de/index/i.json
-src/data/en-de/index/j.json
-src/data/en-de/index/k.json
-src/data/en-de/index/l.json
-src/data/en-de/index/m.json
-src/data/en-de/index/misc.json
-src/data/en-de/index/n.json
-src/data/en-de/index/o.json
-src/data/en-de/index/p.json
-src/data/en-de/index/q.json
-src/data/en-de/index/r.json
-src/data/en-de/index/s.json
-src/data/en-de/index/t.json
-src/data/en-de/index/u.json
-src/data/en-de/index/v.json
-src/data/en-de/index/w.json
-src/data/en-de/index/x.json
-src/data/en-de/index/y.json
-src/data/en-de/index/z.json
-
-# Built SQLite database — regenerate with:
-#   docker compose -f infra/docker/docker-compose.dev.yml run --rm urwort-build
+# Built SQLite database — regenerate with: python3 tools/build-db.py
 data/urwort.db
 data/urwort.db-wal
 data/urwort.db-shm
+
+# Generated ontology data — regenerate with pipeline
+data/ontology.json
+game/public/ontology.json
 
 # Pipeline misc
 tools/output/
 tools/*.log
 
-# Infra secrets — never commit
-infra/.env.ops
-infra/.env.keys
-infra/deploy-keys/
-infra/terraform/.terraform/
-infra/terraform/terraform.tfstate
-infra/terraform/terraform.tfstate.backup
-infra/terraform/.terraform.lock.hcl
-infra/ansible/inventory.yml
+# Vite build output
+game/dist/
