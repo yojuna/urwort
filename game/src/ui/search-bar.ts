@@ -266,7 +266,11 @@ export class SearchBar {
   }
 
   private renderResults(): void {
-    this.clearResults(false);
+    // Remove old results DOM (but keep currentResults — they were just set by onInput)
+    if (this.resultsList) {
+      this.resultsList.remove();
+      this.resultsList = null;
+    }
 
     const list = document.createElement('div');
     list.className = 'urwort-search-results';
@@ -312,8 +316,8 @@ export class SearchBar {
     this.clearResults();
   }
 
-  private clearResults(removeList = true): void {
-    if (removeList && this.resultsList) {
+  private clearResults(): void {
+    if (this.resultsList) {
       this.resultsList.remove();
       this.resultsList = null;
     }

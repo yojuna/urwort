@@ -24,6 +24,7 @@ services:
       - ./api:/workspace/api
       - ./tools:/workspace/tools
       - ./data:/workspace/data
+      - ./raw-data:/workspace/raw-data
       # Persist node_modules inside container (avoid host/container mismatch)
       - urwort_node_modules:/workspace/game/node_modules
     environment:
