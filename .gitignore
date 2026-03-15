@@ -100,6 +100,8 @@ tools/*.log
 
 # Infra secrets — never commit
 infra/.env.ops
+infra/.env.keys
+infra/deploy-keys/
 infra/terraform/.terraform/
 infra/terraform/terraform.tfstate
 infra/terraform/terraform.tfstate.backup
