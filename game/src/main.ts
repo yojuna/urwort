@@ -34,22 +34,27 @@ async function main(): Promise<void> {
   const wordCard = new WordCard(container);
 
   // --- Load ontology data ---
-  let clusters: RootCluster[];
+  let clusters: RootCluster[];         // rendered in the 3D world (multi-word only)
+  let allClusters: RootCluster[];      // full set used by search (every word)
 
   try {
     if (loadingText) loadingText.textContent = 'Loading ontology data...';
 
-    const ontology = await loadOntology({
-      minClusterSize: 2,   // Only show clusters with 2+ words (interesting roots)
-      maxClusters: 200,    // Cap for performance in Phase 0
-    });
-    clusters = ontology.clusters;
+    // Load everything — no filter — so search can find every word
+    const ontology = await loadOntology();
+    allClusters = ontology.clusters;
 
-    console.log(`[Urwort] Using real ontology: ${clusters.length} clusters`);
+    // Render only multi-word clusters, capped for performance
+    clusters = allClusters
+      .filter(c => c.words.length >= 2)
+      .slice(0, 200);
+
+    console.log(`[Urwort] Ontology: ${allClusters.length} total clusters, ${clusters.length} rendered`);
   } catch (err) {
     // Fallback to mock data if ontology.json not available
     console.warn('[Urwort] Failed to load ontology, using mock data:', err);
-    clusters = MOCK_CLUSTERS;
+    clusters    = MOCK_CLUSTERS;
+    allClusters = MOCK_CLUSTERS;
   }
 
   if (loadingText) loadingText.textContent = 'Building world...';
@@ -85,7 +90,7 @@ async function main(): Promise<void> {
     wordCard.showWord(wort, cluster.wurzel, compound);
   });
   // Search over ALL clusters (not just multi-word ones), so single words are findable too
-  searchBar.setClusters(clusters);
+  searchBar.setClusters(allClusters);
 
   // --- Click/tap interaction ---
   const raycaster = new THREE.Raycaster();
