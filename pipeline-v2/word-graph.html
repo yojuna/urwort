@@ -1,0 +1,245 @@
+<title>Urwort Word Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; the worked example is drawn as ground (families, bridges) over strata (history). */
+:root{
+  --bg:#f3f5f4; --paper:#ffffff; --fg:#1d2a2e; --muted:#5c6b70; --rule:#d5dedd;
+  --accent:#1f6f6b; --accent-soft:#dcecea; --stratum:#8a6a2f; --stratum-soft:#f1e8d6;
+  --ok:#2e7d4f; --warn:#a46a0b; --bad:#a3322b; --chip:#e8eeed;
+  --display:"Spectral",Georgia,"Times New Roman",serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121a1c; --paper:#182326; --fg:#e3ecea; --muted:#9db0b2; --rule:#2c3b3e;
+  --accent:#5fc0b8; --accent-soft:#1d3634; --stratum:#d6b06a; --stratum-soft:#2d2618;
+  --ok:#6fcf97; --warn:#e2b04a; --bad:#f08a80; --chip:#22302f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121a1c; --paper:#182326; --fg:#e3ecea; --muted:#9db0b2; --rule:#2c3b3e;
+  --accent:#5fc0b8; --accent-soft:#1d3634; --stratum:#d6b06a; --stratum-soft:#2d2618;
+  --ok:#6fcf97; --warn:#e2b04a; --bad:#f08a80; --chip:#22302f; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--body);}
+.wrap{max-width:780px;margin:0 auto;padding-inline:16px;padding-block:28px 64px;display:flex;flex-direction:column;gap:44px}
+h1,h2,h3{font-family:var(--display);font-weight:600;text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:2.1rem}
+h2{font-size:1.45rem;padding-bottom:6px;border-bottom:1px solid var(--rule)}
+h3{font-size:1.08rem;margin-top:6px}
+p{margin:0;max-width:66ch}
+section{display:flex;flex-direction:column;gap:14px;min-width:0}
+.lede{font-size:1.05rem;color:var(--muted)}
+.eyebrow{font:500 .72rem/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.88em}
+.de{font-family:var(--display);font-style:italic}
+.recon{font-family:var(--display);font-style:italic;color:var(--stratum)}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.fig{background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.fig b{font:600 1.45rem/1.1 var(--display);font-variant-numeric:tabular-nums}
+.fig span{font-size:.82rem;color:var(--muted)}
+.scroll{overflow-x:auto;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:.88rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px 7px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.76rem;letter-spacing:.06em;text-transform:uppercase}
+.pill{display:inline-block;font:500 .72rem/1 var(--body);padding:4px 7px;border-radius:999px;background:var(--chip);white-space:nowrap}
+.pill.ship{background:var(--accent-soft);color:var(--accent)}
+.pill.check{background:var(--stratum-soft);color:var(--stratum)}
+.pill.link{background:var(--chip);color:var(--muted)}
+.pill.pass{color:var(--ok)} .pill.fail{color:var(--bad)}
+.rule{background:var(--paper);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.rule.hist{border-left-color:var(--stratum)}
+.rule strong{font-weight:600}
+ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;max-width:66ch}
+.diagram{background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:8px}
+.diagram svg{display:block;width:100%;min-width:620px;height:auto}
+.diagram text{font-family:var(--body);fill:var(--fg)}
+.caption{font-size:.82rem;color:var(--muted)}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.checks .rule{border-left-color:var(--ok)}
+.checks ul{font-size:.86rem;gap:3px}
+pre.mermaid{background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:12px;margin:0;overflow-x:auto}
+footer{font-size:.8rem;color:var(--muted)}
+</style>
+
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:10px">
+  <span class="eyebrow">urwort · pipeline-v2 · build of 3 Oct 2026</span>
+  <h1>Urwort Word Graph</h1>
+  <p class="lede">How the German word data behind the game is built: which open sources it uses, how words are linked into families and back through history, and which automated checks every build must pass.</p>
+</header>
+
+<div class="figs" aria-label="Key figures">
+  <div class="fig"><b>5,116</b><span>words exported (5,000 most frequent)</span></div>
+  <div class="fig"><b>3,547</b><span>families, 747 with 2+ words at this level</span></div>
+  <div class="fig"><b>185,172</b><span>lemmas in the full lexicon the families are built on</span></div>
+  <div class="fig"><b>88</b><span>Proto-Indo-European roots verified by 2 sources</span></div>
+  <div class="fig"><b>32 / 32</b><span>automated checks passing</span></div>
+</div>
+
+<section>
+  <h2>The model: ground and strata</h2>
+  <p>The graph has two layers, following German lexicography (Augst 2009; Splett 2009). The <strong>surface</strong> holds present-day word families: words a speaker today feels belong together. The <strong>underground</strong> holds history: older stages of the root, back as far as reliable sources reach. Both layers carry their sources on every link.</p>
+  <div class="diagram scroll">
+    <svg viewBox="0 0 760 440" role="img" aria-label="The fahren family drawn as surface words over historical strata">
+      <rect x="0" y="0" width="760" height="190" fill="var(--accent-soft)"/>
+      <rect x="0" y="190" width="760" height="250" fill="var(--stratum-soft)"/>
+      <text x="16" y="24" font-size="11" fill="var(--accent)" font-weight="600" letter-spacing="1.5">SURFACE · FAMILY OF FAHREN (8 of 89 words shown at this level)</text>
+      <g font-size="13">
+        <rect x="320" y="52" width="120" height="34" rx="6" fill="var(--paper)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="380" y="74" text-anchor="middle" font-weight="600">fahren · A1</text>
+        <g stroke="var(--accent)" stroke-width="1.2" fill="none">
+          <path d="M345 86 L120 128"/><path d="M365 86 L265 128"/><path d="M395 86 L410 128"/><path d="M415 86 L560 128"/><path d="M432 86 L690 128"/>
+          <path d="M120 162 L120 170"/><path d="M410 162 L410 170"/>
+        </g>
+        <g>
+          <rect x="62" y="128" width="116" height="34" rx="6" fill="var(--paper)" stroke="var(--rule)"/><text x="120" y="150" text-anchor="middle">er·fahr·en</text>
+          <rect x="210" y="128" width="110" height="34" rx="6" fill="var(--paper)" stroke="var(--rule)"/><text x="265" y="150" text-anchor="middle">Fahr·er</text>
+          <rect x="352" y="128" width="116" height="34" rx="6" fill="var(--paper)" stroke="var(--rule)"/><text x="410" y="150" text-anchor="middle">ver·fahr·en</text>
+          <rect x="502" y="128" width="116" height="34" rx="6" fill="var(--paper)" stroke="var(--rule)"/><text x="560" y="150" text-anchor="middle">vor·fahr·en</text>
+          <rect x="644" y="128" width="96" height="34" rx="6" fill="var(--paper)" stroke="var(--rule)"/><text x="692" y="150" text-anchor="middle">Fahren</text>
+        </g>
+        <text x="120" y="182" text-anchor="middle" font-size="11" fill="var(--muted)">→ Er·fahr·ung</text>
+        <text x="410" y="182" text-anchor="middle" font-size="11" fill="var(--muted)">→ Ver·fahren</text>
+      </g>
+      <line x1="0" y1="190" x2="760" y2="190" stroke="var(--fg)" stroke-width="1.5"/>
+      <text x="16" y="212" font-size="11" fill="var(--stratum)" font-weight="600" letter-spacing="1.5">UNDERGROUND · HISTORY OF THE ROOT</text>
+      <g font-size="13">
+        <line x1="380" y1="190" x2="380" y2="402" stroke="var(--stratum)" stroke-dasharray="3 4"/>
+        <text x="200" y="240" text-anchor="end" fill="var(--muted)" font-size="12">Middle High German</text><text x="400" y="240" font-style="italic">varn</text><text x="560" y="240" font-size="11" fill="var(--muted)">en + de Wiktionary</text>
+        <text x="200" y="280" text-anchor="end" fill="var(--muted)" font-size="12">Old High German</text><text x="400" y="280" font-style="italic">faran</text><text x="560" y="280" font-size="11" fill="var(--muted)">en + de Wiktionary</text>
+        <text x="200" y="320" text-anchor="end" fill="var(--muted)" font-size="12">Proto-West-Germanic</text><text x="400" y="320" font-style="italic" fill="var(--stratum)">*faran</text><text x="560" y="320" font-size="11" fill="var(--muted)">en Wiktionary</text>
+        <text x="200" y="360" text-anchor="end" fill="var(--muted)" font-size="12">Proto-Germanic</text><text x="400" y="360" font-style="italic" fill="var(--stratum)">*faraną ‘to go, to travel’</text><text x="560" y="372" font-size="11" fill="var(--muted)">reconstruction page</text>
+        <text x="200" y="400" text-anchor="end" fill="var(--muted)" font-size="12">Proto-Indo-European</text><text x="400" y="400" font-style="italic" fill="var(--muted)">*per- (hidden: 1 source)</text>
+      </g>
+      <text x="16" y="430" font-size="11" fill="var(--muted)">Cognates: English fare · Dutch varen · Danish fare</text>
+    </svg>
+  </div>
+  <p class="caption">Real data for <span class="de">fahren</span>. Lines on the surface are derivation links (each carries its sources). The Proto-Indo-European root is stored but not shown, because only one source gives it. Principal parts from UniMorph: <span class="de">fährt, fuhr, gefahren</span>.</p>
+  <p><strong>Compounds are bridges, not family members.</strong> <span class="de">Fahrzeug</span> links the families of <span class="de">fahren</span> and <span class="de">Zeug</span>; it does not merge them. The same holds for the old causative pairs (<span class="de">liegen/legen</span>, <span class="de">sitzen/setzen</span>): related in history, but no longer a living pattern (Fleischer &amp; Barz 2012).</p>
+</section>
+
+<section>
+  <h2>The pipeline</h2>
+  <p>Six scripts run in order. Every step is re-runnable from the downloaded sources, so the whole dataset can be rebuilt from scratch.</p>
+  <pre class="mermaid">
+flowchart TD
+  A["download.sh<br/>~4.6 GB of open sources"] --> B["ingest.py<br/>Wiktionary en+de, DErivBase, MorphyNet,<br/>reconstruction pages → lex.db"]
+  B --> C["build.py<br/>typed links + families → graph.db"]
+  C --> D["enrich.py<br/>IE-CoR, UniMorph forms, level model"]
+  D --> E["export.py<br/>urwort-v4.json + game ontology.json"]
+  E --> F{"validate.py<br/>32 checks"}
+  F -- all pass --> G["commit / deploy"]
+  F -- any fail --> C
+  H["goethe_check.py<br/>(check only)"] -.evaluates.-> D
+  </pre>
+</section>
+
+<section>
+  <h2>How words are linked</h2>
+  <p>Each link records its kind (<code>deriv</code>, <code>compound_head</code>, <code>compound_mod</code>, <code>causative</code>) and every source that supports it. In the full lexicon there are 48,561 derivation links: 25,350 with one source, 23,211 with two or more.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Source</th><th>What it contributes</th><th>How it is read</th></tr></thead>
+    <tbody>
+      <tr><td>DErivBase 2.0</td><td>267 derivation rules from German reference grammars</td><td>shortest rule path per word pair; rule ID gives direction and affix</td></tr>
+      <tr><td>German Wiktionary</td><td><em>Herkunft</em> sections, split into <em>strukturell</em> (word structure) and <em>etymologisch</em> (history)</td><td>the linked words in the structural part; base = word after “des Verbs / zum Substantiv …”</td></tr>
+      <tr><td>English Wiktionary</td><td>affix and compound templates; inherited/derived/cognate templates</td><td>template arguments, with hyphen-less prefix templates normalised</td></tr>
+      <tr><td>MorphyNet</td><td>base, derived word, affix</td><td>supporting evidence only; never links on its own</td></tr>
+    </tbody>
+  </table></div>
+  <div class="rule"><strong>Family rule</strong>
+    <ul>
+      <li>Links with 2+ independent sources may merge families freely (60 of 60 correct in a random sample).</li>
+      <li>A one-source link (57 of 60 correct) may attach a single word to a family but may never merge two families. One wrong link (<span class="de">Anfuhr → anführen</span>) would otherwise fuse <span class="de">fahren</span> and <span class="de">führen</span>.</li>
+      <li>Particles (<span class="de">an, auf, aus, fest</span>…) are affixes on verbs and never a family base. Without this rule one family grew to 21,878 words.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>How history is attached</h2>
+  <div class="rule hist"><strong>Stages</strong>
+    <p>Each family gets the chain of its root word: the entry's own templates, then the Proto-West-Germanic and Proto-Germanic reconstruction pages. Middle and Old High German forms are confirmed against German Wiktionary where possible (1,427 of 4,093 stages carry two sources). Stages Wiktionary marks as uncertain carry an <code>origin_uncertain</code> flag.</p>
+  </div>
+  <div class="rule hist"><strong>Proto-Indo-European: two independent sources</strong>
+    <p>Claims from English Wiktionary, German Wiktionary and IE-CoR (an expert cognate database) are compared by consonant skeleton. Vowel grades, laryngeals, <span class="mono">i/y</span>, <span class="mono">u/w</span> and the optional <span class="mono">s-</span> are normalised, so <span class="recon">*yóh₁r̥</span> and <span class="recon">*i̯eh₁-r/n-</span> (<span class="de">Jahr</span>) count as the same root.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Status</th><th>Families</th><th>Shown?</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill pass">verified</span></td><td>88</td><td>yes</td><td><span class="de">stehen</span> <span class="recon">*steh₂-</span> (Wiktionary + IE-CoR)</td></tr>
+        <tr><td><span class="pill">doubted</span></td><td>7</td><td>no</td><td><span class="de">gut</span> <span class="recon">*gʰedʰ-</span>: sources agree, IE-CoR marks it doubtful</td></tr>
+        <tr><td><span class="pill fail">conflict</span></td><td>8</td><td>no</td><td><span class="de">Nacht</span>: <span class="recon">*nókʷts</span> vs <span class="recon">*negʷ-</span></td></tr>
+        <tr><td><span class="pill">single source</span></td><td>458</td><td>no (stored)</td><td><span class="de">fahren</span> <span class="recon">*per-</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="rule hist"><strong>Loans</strong>
+    <p>Loan origins come from the word's entry or the reconstruction pages (<span class="de">Fenster</span> ← Latin <span class="de">fenestra</span>, <span class="de">Straße</span> ← Late Latin <span class="de">strāta</span>): 851 families. Origins in a proto-language are never asserted. They are either hypotheses (<span class="de">Leder</span> ← Proto-Celtic?) or reversed (<span class="de">Burg</span>: Slavic borrowed it from Germanic).</p>
+  </div>
+</section>
+
+<section>
+  <h2>Levels</h2>
+  <p>The official CEFR lists (Goethe-Institut) are copyrighted, so the game uses an <strong>estimated level</strong> built only from openly licensed evidence:</p>
+  <ul>
+    <li><strong>Deutsch im Blick</strong> chapter (first-year course, CC BY): chapters 1–5 → A1, 6–10 → A2.</li>
+    <li><strong>MERLIN</strong> learner texts (CC BY-SA): the lowest rated level at which 2+ learners use the word.</li>
+    <li><strong>Subtitle frequency</strong> per lemma (OpenSubtitles, CC BY-SA) on a 1k / 2k / 4k / 8k / 16k scale.</li>
+    <li><strong>Family cap</strong>: a transparent compound or derivation is at most one level above its parts (Bauer &amp; Nation 1993).</li>
+  </ul>
+  <p>Rule: the course chapter if the word is in the course, else the lower of subtitle and learner level, then the family cap. It was chosen among 13 variants by agreement with the Goethe A1–B1 lists, which are used only for this comparison: <strong>32% exact, 76% within one level</strong>. The lists favour exam topics (<span class="de">Abfahrt, Schrank, ankreuzen</span>) over frequency, which sets a ceiling on any frequency-based estimate.</p>
+</section>
+
+<section>
+  <h2>Checks on every build</h2>
+  <p><code>validate.py</code> stops a build when any check fails. On its first run it caught three wrong loan claims (<span class="de">Burg, Leder, Zaun</span>) that are now fixed.</p>
+  <div class="checks">
+    <div class="rule"><strong>Structure · 10</strong><ul>
+      <li>every word in exactly one family</li><li>roots have no base in their family</li><li>no cycles in derivation trees</li>
+      <li>no family over 250 words (largest: <span class="de">halten</span>, 144)</li><li>no particle as a base</li><li>segments re-assemble to the word</li><li>bridges point to real words</li></ul></div>
+    <div class="rule"><strong>Provenance &amp; licensing · 5</strong><ul>
+      <li>every history stage has a source</li><li>only commercial-safe sources in history and PIE claims</li>
+      <li>no check-only source in any provenance field</li><li>license and sources declared</li></ul></div>
+    <div class="rule"><strong>Project rules · 3</strong><ul>
+      <li>PIE shown only when verified by 2+ sources</li><li>doubted or conflicting PIE never shown</li><li>no loans asserted from proto-languages</li></ul></div>
+    <div class="rule"><strong>Regressions · 14</strong><ul>
+      <li><span class="de">fahren</span> ≠ <span class="de">führen</span>; <span class="de">gewinnen</span> ≠ <span class="de">wohnen</span></li><li><span class="de">verstehen</span> = ver·steh·en</li>
+      <li><span class="de">Haus</span> ← <span class="recon">*hūsą</span>, no Iranian loan</li><li><span class="de">Fenster</span> ← Latin <span class="de">fenestra</span></li><li>…and 9 more facts checked by hand</li></ul></div>
+  </div>
+</section>
+
+<section>
+  <h2>Sources</h2>
+  <p><span class="pill ship">ship</span> may go into game data (commercial-safe) · <span class="pill check">check</span> evaluation only · <span class="pill link">link</span> link out only</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Resource</th><th>Role</th><th>License</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td>English &amp; German Wiktionary (kaikki.org)</td><td>lexicon, structure, history, IPA, audio, glosses</td><td>CC BY-SA 4.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>Wiktionary reconstruction pages</td><td>Proto-West-Germanic, Proto-Germanic, PIE chains</td><td>CC BY-SA 4.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>DErivBase 2.0 (Zeller et al. 2013)</td><td>rule-based derivation families</td><td>CC BY-SA 3.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>MorphyNet (Batsuren et al. 2021)</td><td>supporting derivation evidence</td><td>CC BY-SA 3.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>IE-CoR (Heggarty et al. 2025)</td><td>expert cognate sets; second PIE source; English cognates</td><td>CC BY 4.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>UniMorph German</td><td>gender, plural, verb principal parts, comparison</td><td>CC BY-SA 3.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>Deutsch im Blick (COERLL)</td><td>first-year course vocabulary by chapter</td><td>CC BY 4.0 / BY-SA 4.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>MERLIN learner corpus</td><td>words used per rated level</td><td>CC BY-SA 4.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>OpenSubtitles frequencies, wordfreq</td><td>frequency, scope</td><td>CC BY-SA 4.0</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>Klexikon</td><td>simple-German evidence (recorded)</td><td>CC BY-SA</td><td><span class="pill ship">ship</span></td></tr>
+      <tr><td>Goethe-Institut A1/A2/B1 lists</td><td>evaluating the level model</td><td>© Goethe-Institut</td><td><span class="pill check">check</span></td></tr>
+      <tr><td>DAFlex, SUBTLEX-DE, GhoSt-NN, CogNet, GermaNet</td><td>candidates for further evaluation</td><td>non-commercial / restricted</td><td><span class="pill check">check</span></td></tr>
+      <tr><td>DWDS incl. Pfeifer’s etymological dictionary</td><td>reference links on word cards</td><td>no automated access</td><td><span class="pill link">link</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Known gaps</h2>
+  <ul>
+    <li>Precision was measured by one reviewer on 160 links; a second reviewer would make the figures firmer.</li>
+    <li>1,506 of 3,547 families have no history yet, mostly modern compounds and formations whose history lives in their parts.</li>
+    <li>Single-source compounds from German Wiktionary sometimes take a definition for an origin (<span class="de">Samt</span> ← <span class="de">Seidengewebe</span>).</li>
+    <li>Transparency per link (how obvious <span class="de">stehen → verstehen</span> is) is not scored yet.</li>
+    <li>Meaning fields (OdeNet) and historical example sentences (DTA, ReM) are catalogued but not integrated.</li>
+  </ul>
+</section>
+
+<footer>Code and full method: <span class="mono">pipeline-v2/</span> in yojuna/urwort (branch <span class="mono">pipeline-v2</span>). Data license: CC BY-SA 4.0.</footer>
+</div>
