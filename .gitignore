@@ -43,3 +43,8 @@ tools/*.log
 
 # Vite build output
 game/dist/
+
+# pipeline-v2 working files
+*.log
+pipeline-v2/out/
+pipeline-v2/.venv/

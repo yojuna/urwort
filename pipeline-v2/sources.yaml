@@ -1,0 +1,11 @@
+# pipeline-v2 sources. use: ship = may end up in game data (commercial-safe); check = validation only.
+derivbase:   {url: "https://www.ims.uni-stuttgart.de/en/research/resources/lexica/derivbase/", license: CC BY-SA 3.0, use: ship,
+              cite: "Zeller, Šnajder, Padó (2013) DErivBase: Inducing and Evaluating a Derivational Morphology Resource for German. ACL"}
+morphynet:   {url: "https://github.com/kbatsuren/MorphyNet", license: CC BY-SA 3.0, use: ship,
+              cite: "Batsuren et al. (2021) MorphyNet. SIGMORPHON"}
+wiktionary_en: {url: "https://kaikki.org/dictionary/German/", license: CC BY-SA 4.0 + GFDL, use: ship,
+              cite: "Ylonen (2022) Wiktextract. LREC"}
+wiktionary_de: {url: "https://kaikki.org/dewiktionary/Deutsch/", license: CC BY-SA 4.0 + GFDL, use: ship}
+wordfreq:    {url: "https://github.com/rspeer/wordfreq", license: "data CC BY-SA 4.0, code Apache-2.0", use: ship,
+              cite: "Speer (2022) wordfreq v3.0. Zenodo"}
+daflex:      {url: "https://cental.uclouvain.be/cefrlex/daflex/", license: CC BY-NC-SA 4.0, use: check, note: "no bulk download offered"}
