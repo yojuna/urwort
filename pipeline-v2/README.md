@@ -94,3 +94,22 @@ The old clusters disagreed with v2 on 105 word pairs. These are mostly the expec
 Export of 2026-10-03 (top 5,000): 5,116 words, 3,547 families (747 with 2+ words at this level),
 317 bridges, 1,188 words with segments. 945 families have a Germanic chain and 854 a loan origin.
 Verified: `npm run build` passes, and the page loads 5,116 words with no console errors in headless Chromium.
+
+## Enrichment, levels and checks (2026-10-03, second round)
+
+```bash
+.venv/bin/python goethe_check.py   # CHECK ONLY: Goethe A1/A2/B1 headwords -> out/goethe-levels.json (never shipped)
+.venv/bin/python enrich.py         # IE-CoR, UniMorph forms, level evidence + model -> graph.db tables iecor/forms/level
+.venv/bin/python export.py --n 5000 --game
+.venv/bin/python validate.py       # 32 checks (structure, provenance/licensing, project rules, regressions); non-zero exit on failure
+```
+
+- **Proto-Indo-European**: claims from English Wiktionary, German Wiktionary and IE-CoR are compared by consonant
+  skeleton (vowels/ablaut, laryngeals, i/y, u/w, s-mobile normalised). The root is shown only when 2+ independent sources agree
+  and IE-CoR's experts don't mark it doubtful. Result: 88 verified (was 50), 7 doubted, 8 genuine conflicts
+  (*Nacht*, *sterben*, *fallen*…), 458 single-source (kept, hidden).
+- **Forms** (UniMorph): gender, plural, genitive; 3sg present/past and participle; comparative/superlative.
+- **Levels**: rule `dib else min(subs2, merlin) +family`, chosen among 13 variants by agreement with the Goethe lists
+  (check only): 32% exact, 76% within one level. Inputs are commercial-safe: Deutsch im Blick chapter (1–5 A1, 6–10 A2),
+  subtitle frequency per lemma on a doubling scale (1k/2k/4k/8k/16k), first level used in ≥2 MERLIN texts, and a family cap
+  (a word is at most one level above its parts; Bauer & Nation 1993). Shown as an *estimated* level, not official CEFR.

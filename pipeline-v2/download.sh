@@ -18,5 +18,23 @@ get https://kaikki.org/dewiktionary/Deutsch/kaikki.org-dictionary-Deutsch.jsonl 
 get "https://kaikki.org/dictionary/Proto-West%20Germanic/kaikki.org-dictionary-ProtoWestGermanic.jsonl" kaikki-en-gmw-pro.jsonl
 get https://kaikki.org/dictionary/Proto-Germanic/kaikki.org-dictionary-ProtoGermanic.jsonl kaikki-en-gem-pro.jsonl
 get https://kaikki.org/dictionary/Proto-Indo-European/kaikki.org-dictionary-ProtoIndoEuropean.jsonl kaikki-en-ine-pro.jsonl
+# IE-CoR (CC BY 4.0): expert cognate sets; second, independent source for PIE roots
+mkdir -p iecor && for f in languages forms cognates cognatesets parameters sources.bib; do
+  case $f in *.bib) n=$f;; *) n=$f.csv;; esac
+  get "https://raw.githubusercontent.com/lexibank/iecor/master/cldf/$n" "iecor/$n"; done
+# UniMorph German (CC BY-SA 3.0): inflected forms
+get https://raw.githubusercontent.com/unimorph/deu/master/deu unimorph-deu.tsv
+# Level model inputs (all commercial-safe)
+get https://raw.githubusercontent.com/ghrgriner/deutsch-im-blick/main/output/deck/dib_deck.txt dib_deck.txt
+get https://raw.githubusercontent.com/ghrgriner/deutsch-im-blick/main/output/deck/dib_deck_fields.txt dib_deck_fields.txt
+get "https://clarin.eurac.edu/repository/xmlui/bitstream/handle/20.500.12124/59/merlin-text-v1.2.zip?sequence=17&isAllowed=y" merlin-text-v1.2.zip
+get https://huggingface.co/datasets/dennlinger/klexikon/resolve/main/data/train.json klexikon-train.json
+get https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/de/de_full.txt opensubtitles-de_full.txt
+# CHECK ONLY (copyrighted, never shipped): Goethe-Institut word lists, to evaluate our level estimates
+mkdir -p check
+get https://www.goethe.de/pro/relaunch/prf/de/A1_SD1_Wortliste_02.pdf check/goethe-A1.pdf
+get https://www.goethe.de/pro/relaunch/prf/de/Goethe-Zertifikat_A2_Wortliste.pdf check/goethe-A2.pdf
+get https://www.goethe.de/pro/relaunch/prf/de/Goethe-Zertifikat_B1_Wortliste.pdf check/goethe-B1.pdf
+[ -d merlin ] || unzip -q -o merlin-text-v1.2.zip -d merlin
 [ -d derivbase-v2.0 ] || unzip -q -o derivbase-v2.0.zip -d derivbase-v2.0
 echo done

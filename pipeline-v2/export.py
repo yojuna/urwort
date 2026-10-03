@@ -94,8 +94,58 @@ def recon_loan(stages):
     return None
 
 
-def history_chain(h):
-    """Merge the word's own chain with the reconstruction pages. Each stage records its sources."""
+PIE_MAP = [("k̑", "ḱ"), ("g̑", "ǵ"), ("i̯", "y"), ("u̯", "w"), ("ʷ", "w"), ("⁽", ""), ("⁾", ""),
+           ("(", ""), (")", ""), ("?", ""), ("*", ""), ("-", ""), ("₁", "1"), ("₂", "2"), ("₃", "3"), ("₄", "4")]
+
+
+def pie_key(form):
+    """Normalise reconstruction notation so different conventions compare equal (*k̑ueit- = *ḱweyt-)."""
+    f = (form or "").strip().lower().split("/")[0].rstrip(".–")
+    f = f.replace("ĝ", "ǵ").replace("k̂", "ḱ")
+    for a, b in PIE_MAP: f = f.replace(a, b)
+    f = unicodedata.normalize("NFKD", f)
+    return "".join(c for c in f if not unicodedata.combining(c))
+
+
+def pie_skeleton(form):
+    """Consonant skeleton for comparing roots across sources and notations:
+    - vowels dropped (ablaut grades e/o/zero differ): *yóh₁r̥ ~ *i̯eh₁-r/n-
+    - laryngeals dropped, incl. unspecified H (older notation omits them): *h₂eHs- ~ *h₂eh₁s-
+    - i/y, u/w, j/y are one sound each; s-mobile '(s)' is optional: *(s)kert- ~ *kret-"""
+    f = (form or "").replace("H", "h0").replace("(s)", "")
+    k = pie_key(f).replace("j", "y").replace("i", "y").replace("u", "w").replace("r̥", "r")
+    k = re.sub(r"h[0-4]|[aeoāēō]", "", k)
+    return re.sub(r"[^a-zʔʰ]", "", k)
+
+
+def pie_status(en_stage, h, ie):
+    """Proto-Indo-European is shown only when two independent sources agree (English Wiktionary,
+    German Wiktionary, IE-CoR) and IE-CoR's experts do not mark it as doubtful."""
+    claims = {}
+    if en_stage: claims["wikt_en"] = en_stage["form"]
+    if h.get("de_pie"): claims["wikt_de"] = h["de_pie"]
+    if ie and ie["root_lang"] == "Proto-Indo-European": claims["iecor"] = "*" + ie["root_form"].lstrip("*")
+    if not claims: return None
+    keys = {s: pie_skeleton(f) for s, f in claims.items()}
+    groups = collections.defaultdict(list)
+    for s, k in keys.items():
+        # extended roots (*gʰreud- vs *gʰreu-) count as agreement when one is a prefix of the other
+        match = next((g for g in groups if g.startswith(k) or k.startswith(g)), k)
+        groups[match].append(s)
+    best = max(groups.values(), key=len)
+    # display in Wiktionary's (Leiden-style) notation; every source's own form stays in "claims"
+    form = claims["wikt_en"] if "wikt_en" in best else claims[best[0]]
+    doubt = bool(ie and ie["root_lang"] == "Proto-Indo-European" and ie["doubt"])
+    if len(best) >= 2 and not doubt: status = "verified"
+    elif len(best) >= 2: status = "doubted"
+    elif len(groups) > 1: status = "conflict"
+    else: status = "single_source"
+    return {"form": form, "gloss": en_stage.get("gloss") if en_stage else None, "claims": claims, "agreeing": sorted(best),
+            "status": status, "iecor_comment": ie["comment"] if ie else None}
+
+
+def history_chain(h, ie=None):
+    """Merge the word's own chain with the reconstruction pages and IE-CoR. Each stage records its sources."""
     stages = {}
     for st in STAGE_ORDER:
         if h.get("en_" + st):
@@ -128,12 +178,13 @@ def history_chain(h):
                 stages[st] = {"form": h["de_" + st], "sources": ["wikt_de"]}
     if h.get("de_pgmc"):
         stages.setdefault("gem-pro", {"form": h["de_pgmc"], "sources": []})["sources"].append("wikt_de")
-    pie = None
-    if "ine-pro" in stages:
-        en_pie = stages.pop("ine-pro")
-        verified = bool(h.get("de_pie"))
-        pie = {"form": en_pie["form"], "gloss": en_pie.get("gloss"), "sources": en_pie["sources"] + (["wikt_de"] if verified else []),
-               "de_form": h.get("de_pie"), "status": "verified" if verified else "single_source"}
+    # IE-CoR (expert cognate sets): confirms a Proto-Germanic stage when the forms agree
+    if ie and ie["root_lang"] == "Proto-Germanic":
+        if "gem-pro" in stages and pie_key(stages["gem-pro"]["form"]) == pie_key(ie["root_form"]):
+            stages["gem-pro"]["sources"].append("iecor")
+        elif "gem-pro" not in stages:
+            stages["gem-pro"] = {"form": "*" + ie["root_form"].lstrip("*"), "sources": ["iecor"]}
+    pie = pie_status(stages.pop("ine-pro", None), h, ie)
     loan = recon_loan(stages)
     chain = [{"stage": st, "lang": LANG_NAMES[st], "form": stages[st]["form"], "gloss": stages[st].get("gloss"),
               "sources": stages[st]["sources"], "origin_uncertain": stages[st].get("origin_uncertain", False)} for st in STAGE_ORDER if st in stages]
@@ -207,6 +258,65 @@ def main():
             tree[w] = (root, None)
         return tree
 
+    iecor_rows = collections.defaultdict(list)
+    for r in G.execute("select word, root_form, root_lang, doubt, cognateset, english, comment from iecor"):
+        iecor_rows[r[0]].append(dict(zip(("word", "root_form", "root_lang", "doubt", "cognateset", "english", "comment"), r)))
+
+    def iecor_for(word, h):
+        """A word can sit in several cognate sets (one per meaning); prefer the set whose root matches Wiktionary's."""
+        rows = iecor_rows.get(word, [])
+        en = h.get("en_ine-pro") or h.get("de_pie")
+        return next((r for r in rows if en and pie_skeleton(r["root_form"]).startswith(pie_skeleton(en)[:3])), rows[0] if rows else None)
+    forms = collections.defaultdict(list)
+    for w, f, ft in G.execute("select word, form, feats from forms"): forms[w].append((f, ft))
+    levels = {w: (lv, json.loads(ev)) for w, lv, ev in G.execute("select word, level, evidence from level")}
+    GERMANIC = ("gml", "nds", "dum", "osx", "ang", "non", "got", "nl", "odt", "ofs", "goh", "gmh", "gmw-pro", "gem-pro")
+
+    def family_record(fid, root, members, size_full, hw):
+        h = hist.get(hw, {})
+        ie = iecor_for(hw, h) or iecor_for(root, h)
+        chain, pie, loan = history_chain(h, ie)
+        borrowed = loan
+        # proto-language sources are hypotheses (Leder < Proto-Celtic?) or reversed (Burg -> Proto-Slavic): never asserted
+        if (not borrowed and h.get("en_from") and not h["en_from"].split(":")[0].endswith("-pro")
+                and (not chain or h["en_from"].split(":")[0] not in GERMANIC)):
+            code, _, form = h["en_from"].partition(":")
+            borrowed = {"lang_code": code, "lang": LANG_NAMES.get(code, code), "form": form, "sources": ["wikt_en:entry"]}
+        cognates = {k[4:]: {"form": v, "sources": ["wikt_en:entry"]} for k, v in h.items() if k.startswith("cog_")}
+        if ie and ie["english"]:  # expert cognate judgement (IE-CoR)
+            c = cognates.setdefault("en", {"form": ie["english"], "sources": []})
+            c["sources"].append("iecor")
+            if c["form"] != ie["english"]: c["iecor_form"] = ie["english"]
+        return {"id": fid, "root": root, "members": members, "size_full": size_full, "history_from": hw,
+                "history": chain, "pie": pie, "borrowed_from": borrowed, "cognates": cognates,
+                "iecor_cognateset": ie["cognateset"] if ie else None, "weight": round(sum(zipf(m) for m in members), 2)}
+
+    def principal_forms(w, pos):
+        """A few forms a learner needs (UniMorph): gender/plural/genitive, verb principal parts, comparison."""
+        fs = forms.get(w, [])
+        pick = lambda pat: next((f for f, ft in fs if all(t in ft.split(";") for t in pat)), None)
+        out = {}
+        if pos == "NOUN":
+            g = next((t for f, ft in fs for t in ft.split(";") if t in ("MASC", "FEM", "NEUT")), None)
+            out = {"gender": {"MASC": "m", "FEM": "f", "NEUT": "n"}.get(g), "plural": pick(("N", "NOM", "PL")),
+                   "genitive": pick(("N", "GEN", "SG"))}
+        elif pos == "VERB":
+            out = {"present_3sg": pick(("V", "IND", "PRS", "3", "SG")), "past_3sg": pick(("V", "IND", "PST", "3", "SG")),
+                   "past_participle": pick(("V.PTCP", "PST"))}
+        elif pos == "ADJ":
+            out = {"comparative": pick(("ADJ", "CMPR")), "superlative": pick(("ADJ", "SPRL"))}
+        return {k: v for k, v in out.items() if v} or None
+
+    def word_record(m, fid, base, base_edge, segs):
+        info = wikt_info(m)
+        pos = info["pos"] or POS_MAP.get(lex[m]["pos"][0])
+        lv, ev = levels.get(m, (None, {}))
+        return {"family": fid, "pos": pos, "rank": rank.get(m), "in_scope": m in scope_set,
+                "level": lv, "level_evidence": {k: v.get("level", v) for k, v in ev.items() if k in ("dib", "merlin", "subs2")},
+                "base": base, "base_sources": (base_edge or {}).get("sources"),
+                "segments": segs(pos) if segs else None, "forms": principal_forms(m, pos),
+                "ipa": info["ipa"], "audio": info["audio"], "gloss_en": info["gloss_en"], "gloss_de": info["gloss_de"]}
+
     families, words, used_fams = [], {}, {}
     for w in scope:
         f = lex[w]["family"]
@@ -215,59 +325,34 @@ def main():
         root = root_of(f)
         tree = parent_tree(f, root)
         members = [m for m in fam_members[f] if m in scope_set or m == root]
-        # history: the root's, else the best-attested member's (often the noun carries the etymology)
         # history from the root itself, or its noun/verb twin (fahren/Fahren); never from another member
         twins = [root] + [m for m in fam_members[f] if m != root and m.casefold() == root.casefold()]
         hw = max(twins, key=lambda m: len(hist.get(m, {})))
-        h = hist.get(hw, {})
-        chain, pie, loan = history_chain(h)
-        borrowed = loan
-        if not borrowed and h.get("en_from") and (not chain or h["en_from"].split(":")[0] not in ("gml", "nds", "dum", "osx", "ang", "non", "got", "nl", "odt", "ofs", "goh", "gmh", "gmw-pro", "gem-pro")):
-            code, _, form = h["en_from"].partition(":")
-            borrowed = {"lang_code": code, "lang": LANG_NAMES.get(code, code), "form": form, "sources": ["wikt_en:entry"]}
-        cognates = {k[4:]: v for k, v in h.items() if k.startswith("cog_")}
         fid = f"fam-{len(families) + 1}"
-        families.append({"id": fid, "root": root, "members": members, "size_full": len(fam_members[f]),
-                         "history_from": hw, "history": chain, "pie": pie, "borrowed_from": borrowed,
-                         "cognates": cognates, "weight": round(sum(zipf(m) for m in members), 2)})
+        families.append(family_record(fid, root, members, len(fam_members[f]), hw))
         for m in members:
-            info = wikt_info(m)
             path, x = [], m
             while tree.get(x, (None, None))[0] is not None:
-                base, e = tree[x]
+                b, e = tree[x]
                 if e:
                     aff = next((e["info"][s] for s in ("wikt_de", "wikt_en", "morphynet") if e["info"].get(s)), None)
                     if aff: path.append(aff.split(",")[-1])
-                x = base
-            pos = info["pos"] or POS_MAP.get(lex[m]["pos"][0])
-            words[m] = {"family": fid, "pos": pos, "rank": rank.get(m), "in_scope": m in scope_set,
-                        "base": tree.get(m, (None,))[0],
-                        "base_sources": (tree.get(m, (None, None))[1] or {}).get("sources"),
-                        "segments": segment(m, list(reversed(path)), pos) if m != root else None,
-                        "ipa": info["ipa"], "audio": info["audio"], "gloss_en": info["gloss_en"], "gloss_de": info["gloss_de"]}
+                x = b
+            segs = (lambda pos, m=m, path=path: segment(m, list(reversed(path)), pos)) if m != root else None
+            words[m] = word_record(m, fid, tree.get(m, (None,))[0], tree.get(m, (None, None))[1], segs)
 
     # unattached scope words (no family) become single-word families so nothing is lost
     for w in scope:
         if w in words: continue
-        info = wikt_info(w); h = hist.get(w, {})
-        chain, pie, loan = history_chain(h)
         fid = f"fam-{len(families) + 1}"
-        borrowed = loan
-        if not borrowed and h.get("en_from") and (not chain or h["en_from"].split(":")[0] not in ("gml", "nds", "dum", "osx", "ang", "non", "got", "nl", "odt", "ofs", "goh", "gmh", "gmw-pro", "gem-pro")):
-            code, _, form = h["en_from"].partition(":")
-            borrowed = {"lang_code": code, "lang": LANG_NAMES.get(code, code), "form": form, "sources": ["wikt_en:entry"]}
-        families.append({"id": fid, "root": w, "members": [w], "size_full": 1, "history_from": w, "history": chain, "pie": pie,
-                         "borrowed_from": borrowed, "cognates": {k[4:]: v for k, v in h.items() if k.startswith("cog_")},
-                         "weight": round(zipf(w), 2)})
-        words[w] = {"family": fid, "pos": info["pos"] or POS_MAP.get(lex[w]["pos"][0]), "rank": rank.get(w), "in_scope": True,
-                    "base": None, "base_sources": None, "segments": None, "ipa": info["ipa"], "audio": info["audio"],
-                    "gloss_en": info["gloss_en"], "gloss_de": info["gloss_de"]}
+        families.append(family_record(fid, w, [w], 1, w))
+        words[w] = word_record(w, fid, None, None, None)
 
     # last resort for loan origin: a category-level claim (dercat) naming a non-Germanic source language
     germanic = {"gml", "nds", "dum", "osx", "ang", "non", "got", "nl", "odt", "ofs", "goh", "gmh", *PROTO}
     for fam in families:
         if not fam["borrowed_from"]:
-            langs = [l for l in hist.get(fam["history_from"], {}).get("en_dercat", []) if l not in germanic]
+            langs = [l for l in hist.get(fam["history_from"], {}).get("en_dercat", []) if l not in germanic and not l.endswith("-pro")]
             if langs:
                 fam["borrowed_from"] = {"lang_code": langs[0], "lang": LANG_NAMES.get(langs[0], langs[0]), "form": None,
                                         "sources": ["wikt_en:category"]}
@@ -326,7 +411,7 @@ def write_v3(v4):
         if chain:
             chain.append({"stage": "nhg", "form": root, "lang_name": "Modern German", "is_reconstructed": False})
         origin = chain[0]["lang_name"] if chain else (f["borrowed_from"]["lang"] if f["borrowed_from"] else "Modern German")
-        gem = next((s["form"] for s in f["history"] if s["stage"] == "gem-pro"), None)
+        gem = chain[0]["form"] if chain and chain[0]["is_reconstructed"] else None  # oldest shown stage, matching origin
         cog_names = {"en": "English", "nl": "Dutch", "got": "Gothic", "ang": "Old English", "enm": "Middle English",
                      "non": "Old Norse", "sv": "Swedish", "da": "Danish"}
         rw = words.get(root) or {}
@@ -334,7 +419,7 @@ def write_v3(v4):
             "wurzel": {"id": f["id"], "form": root, "meaning_de": (rw.get("gloss_de") or [""])[0],
                        "meaning_en": (rw.get("gloss_en") or [""])[0], "origin_lang": origin, "proto_form": gem,
                        "etymology_chain": chain,
-                       "cognates": [{"language": cog_names.get(k, k), "form": v} for k, v in f["cognates"].items()],
+                       "cognates": [{"language": cog_names.get(k, k), "form": v["form"]} for k, v in f["cognates"].items()],
                        "borrowing_info": ({"from_lang": f["borrowed_from"]["lang"], "form": f["borrowed_from"]["form"],
                                            "lang_code": f["borrowed_from"]["lang_code"]} if f["borrowed_from"] else None),
                        "source_urls": {"wiktionary": f"https://en.wiktionary.org/wiki/{f['history_from']}#German",
@@ -343,7 +428,7 @@ def write_v3(v4):
         for m in sorted(f["members"], key=lambda m: (words[m]["rank"] or 10**6)):
             d = words[m]
             cluster["words"].append({
-                "id": word_id[m], "lemma": m, "pos": d["pos"] or "X", "ipa": d["ipa"],
+                "id": word_id[m], "lemma": m, "pos": d["pos"] or "X", "ipa": d["ipa"], "cefr_level": d["level"],
                 "definition_en": "; ".join(d["gloss_en"][:2]), "definition_de": "; ".join(d["gloss_de"][:2]),
                 "segments": d["segments"] if d["segments"] and len(d["segments"]) > 1 else None,
                 "source_urls": {"wiktionary": f"https://en.wiktionary.org/wiki/{m}#German",

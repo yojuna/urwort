@@ -9,3 +9,14 @@ wiktionary_de: {url: "https://kaikki.org/dewiktionary/Deutsch/", license: CC BY-
 wordfreq:    {url: "https://github.com/rspeer/wordfreq", license: "data CC BY-SA 4.0, code Apache-2.0", use: ship,
               cite: "Speer (2022) wordfreq v3.0. Zenodo"}
 daflex:      {url: "https://cental.uclouvain.be/cefrlex/daflex/", license: CC BY-NC-SA 4.0, use: check, note: "no bulk download offered"}
+iecor:       {url: "https://github.com/lexibank/iecor", license: CC BY 4.0, use: ship,
+              cite: "Heggarty et al. (2025) The Indo-European Cognate Relationships dataset. Scientific Data"}
+unimorph:    {url: "https://github.com/unimorph/deu", license: CC BY-SA 3.0, use: ship, cite: "Batsuren et al. (2022) UniMorph 4.0. LREC"}
+dib:         {url: "https://github.com/ghrgriner/deutsch-im-blick", license: "CC BY-SA 4.0 (textbook CC BY 4.0)", use: ship,
+              cite: "Abrams (2017) Deutsch im Blick, 2nd ed. COERLL, UT Austin"}
+merlin:      {url: "https://clarin.eurac.edu/repository/xmlui/handle/20.500.12124/59", license: CC BY-SA 4.0, use: ship,
+              cite: "Boyd et al. (2014) The MERLIN corpus: Learner language and the CEFR. LREC"}
+klexikon:    {url: "https://huggingface.co/datasets/dennlinger/klexikon", license: CC BY-SA, use: ship, cite: "Aumiller & Gertz (2022) LREC"}
+opensubtitles_freq: {url: "https://github.com/hermitdave/FrequencyWords", license: CC BY-SA 4.0, use: ship,
+              cite: "Lison & Tiedemann (2016) OpenSubtitles2016. LREC"}
+goethe_lists: {url: "https://www.goethe.de/", license: "© Goethe-Institut", use: check, note: "evaluation of the level model only (goethe_check.py)"}
