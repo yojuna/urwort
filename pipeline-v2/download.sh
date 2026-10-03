@@ -14,5 +14,9 @@ get https://www.ims.uni-stuttgart.de/documents/ressourcen/lexika/derivbase/deriv
 get https://raw.githubusercontent.com/kbatsuren/MorphyNet/main/deu/deu.derivational.v1.tsv morphynet-deu.derivational.v1.tsv
 get https://kaikki.org/dictionary/German/kaikki.org-dictionary-German.jsonl kaikki-en-German.jsonl
 get https://kaikki.org/dewiktionary/Deutsch/kaikki.org-dictionary-Deutsch.jsonl kaikki-de-Deutsch.jsonl
+# Reconstruction pages (Proto-West-Germanic, Proto-Germanic, Proto-Indo-European): follow history chains and descendants
+get "https://kaikki.org/dictionary/Proto-West%20Germanic/kaikki.org-dictionary-ProtoWestGermanic.jsonl" kaikki-en-gmw-pro.jsonl
+get https://kaikki.org/dictionary/Proto-Germanic/kaikki.org-dictionary-ProtoGermanic.jsonl kaikki-en-gem-pro.jsonl
+get https://kaikki.org/dictionary/Proto-Indo-European/kaikki.org-dictionary-ProtoIndoEuropean.jsonl kaikki-en-ine-pro.jsonl
 [ -d derivbase-v2.0 ] || unzip -q -o derivbase-v2.0.zip -d derivbase-v2.0
 echo done

@@ -74,3 +74,23 @@ The old clusters disagreed with v2 on 105 word pairs. These are mostly the expec
    DErivBase v2 probabilities plus embeddings.
 5. **Levels**: commercial-safe CEFR estimate (frequency + family + affix difficulty) calibrated against
    DAFlex (BY-NC-SA, check only).
+
+## Game data (export.py)
+
+```bash
+.venv/bin/python export.py --n 5000 --game   # -> out/urwort-v4.json (copied to data/) + game/public/ontology.json
+```
+
+- **v4** (`data/urwort-v4.json`): canonical data for the redesign. It holds families (root, members, history
+  chain with per-stage sources, PIE with status, loan origin, cognates), words (rank, base, segments, IPA, audio,
+  glosses), and bridges (compounds with head/modifiers and confidence; causative pairs).
+- **v3** (`game/public/ontology.json`): the same data in the current client's format, so the existing game runs on it.
+  It deliberately leaves out CEFR, because the old levels had no traceable source. A commercial-safe level estimate is still to do.
+- **History rules**: chains follow the word's entry, then the Proto-West-Germanic and Proto-Germanic reconstruction pages.
+  Medieval stages are confirmed against German Wiktionary when possible. PIE is shown only with both editions
+  (50 families); 472 single-source PIE candidates are kept in v4 but hidden. Loans proposed from proto-languages are
+  hypotheses and are rejected. Stages Wiktionary marks `unc` carry `origin_uncertain`.
+
+Export of 2026-10-03 (top 5,000): 5,116 words, 3,547 families (747 with 2+ words at this level),
+317 bridges, 1,188 words with segments. 945 families have a Germanic chain and 854 a loan origin.
+Verified: `npm run build` passes, and the page loads 5,116 words with no console errors in headless Chromium.

@@ -7,6 +7,8 @@ Tables
   derivbase_pair(a, a_pos, b, b_pos, path_len, path)   shortest rule path per lemma pair (DErivBase v2.0)
   derivbase_member(family, cluster, lemma, pos)        family = v2 semantic cluster id
   morphynet(base, derived, base_pos, derived_pos, affix, kind)
+  recon(lang, word, pos, ety_templates, descendants, gloss)   Wiktionary reconstruction pages (gmw-pro, gem-pro, ine-pro);
+                                                         word without the leading '*'
 
 Usage: .venv/bin/python ingest.py   (about 5 minutes; re-run rebuilds from scratch)
 """
@@ -90,6 +92,19 @@ def ingest_morphynet(con):
     print(f"  morphynet: {len(rows):,} rows", file=sys.stderr)
 
 
+def ingest_recon(con):
+    for lang in ("gmw-pro", "gem-pro", "ine-pro"):
+        rows = []
+        for line in open(RAW / f"kaikki-en-{lang}.jsonl", encoding="utf-8"):
+            d = json.loads(line)
+            tmpl = [{"name": t["name"], "args": t.get("args", {})} for t in d.get("etymology_templates", [])]
+            desc = [{"lang": x.get("lang_code"), "word": x.get("word")} for x in d.get("descendants", []) if x.get("word")]
+            gloss = next((g for s in d.get("senses", []) for g in s.get("glosses", [])), None)
+            rows.append((lang, d["word"].lstrip("*"), d.get("pos"), j(tmpl), j(desc), gloss))
+        con.executemany("INSERT INTO recon VALUES (?,?,?,?,?,?)", rows)
+        print(f"  recon[{lang}]: {len(rows):,}", file=sys.stderr)
+
+
 def main():
     OUT.mkdir(exist_ok=True)
     DB.unlink(missing_ok=True)
@@ -100,15 +115,17 @@ def main():
       CREATE TABLE derivbase_pair(a, a_pos, b, b_pos, path_len INT, path);
       CREATE TABLE derivbase_member(family INT, cluster INT, lemma, pos);
       CREATE TABLE morphynet(base, derived, base_pos, derived_pos, affix, kind);
+      CREATE TABLE recon(lang, word, pos, ety_templates, descendants, gloss);
     """)
     ingest_derivbase(con)
     ingest_morphynet(con)
+    ingest_recon(con)
     ingest_wikt(con, "en", RAW / "kaikki-en-German.jsonl", "de")
     ingest_wikt(con, "de", RAW / "kaikki-de-Deutsch.jsonl", "de")
     con.executescript("""
       CREATE INDEX wikt_word ON wikt(word); CREATE INDEX db_a ON derivbase_pair(a); CREATE INDEX db_b ON derivbase_pair(b);
       CREATE INDEX dbm_lemma ON derivbase_member(lemma); CREATE INDEX dbm_fam ON derivbase_member(family, cluster);
-      CREATE INDEX mn_base ON morphynet(base); CREATE INDEX mn_der ON morphynet(derived);
+      CREATE INDEX recon_w ON recon(lang, word); CREATE INDEX mn_base ON morphynet(base); CREATE INDEX mn_der ON morphynet(derived);
     """)
     con.commit()
     print(f"wrote {DB} ({DB.stat().st_size/1e6:.0f} MB)", file=sys.stderr)

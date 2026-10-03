@@ -101,16 +101,35 @@ def edges_wikt_de(con, lex, add, hist):
             h.setdefault("de_pgmc", m.group(1).replace(" ", ""))
         if m := re.search(r"indogermanisch\s+(\*\s*[^\s,;]+)", text):
             h.setdefault("de_pie", m.group(1).replace(" ", ""))
+        # "mittelhochdeutsch varn ^(→ gmh), althochdeutsch faran": a second source for the medieval stages
+        for stage, name in (("gmh", "mittelhochdeutsch"), ("goh", "althochdeutsch")):
+            if m := re.search(rf"(?<![a-zä]){name}\s+(?:[„»\"])?([^\s,;^(„“»«\"]+)", text):
+                h.setdefault("de_" + stage, m.group(1))
         for d in json.loads(derived) if derived else []:
             if d in lex and d != word:
                 add(word, d, "wb", "wikt_de_wb", None)
 
 
 def edges_wikt_en(con, lex, add, hist):
-    for word, tmpl_json, kind in con.execute("select word, ety_templates, kind from wikt where src='en'"):
-        if kind != "lemma" or word not in lex or not tmpl_json:
+    tree_names = {"Proto-Indo-European": "ine-pro", "Proto-Germanic": "gem-pro", "Proto-West Germanic": "gmw-pro",
+                  "Old High German": "goh", "Middle High German": "gmh"}
+    for word, tmpl_json, kind, text in con.execute("select word, ety_templates, kind, ety_text from wikt where src='en'"):
+        if kind != "lemma" or word not in lex:
             continue
         h = hist.setdefault(word, {})
+        # newer entries use {{ety}}, expanded as "Etymology tree\n<Lang> <form>\n...\nGerman <word>".
+        # Take the branch that ends at this word: the last line per stage before "German <word>".
+        tree = {}
+        if text and text.startswith("Etymology tree"):
+            lines = text.split("\n")[1:]
+            end = next((i for i, l in enumerate(lines) if l.strip() == f"German {word}"), None)
+            for l in (lines[:end] if end is not None else []):
+                for name, code in tree_names.items():
+                    if l.startswith(name + " ") and not l.startswith(name + " German"):
+                        tree["en_" + code] = l[len(name) + 1:].replace("der.", "").strip()
+        if not tmpl_json:
+            for k, v in tree.items(): h.setdefault(k, v)
+            continue
         for t in json.loads(tmpl_json):
             name, a = t["name"], t["args"]
             if name in AFFIX_TEMPLATES and a.get("1") == "de":
@@ -144,6 +163,9 @@ def edges_wikt_en(con, lex, add, hist):
                 h["en_dercat"] = sorted(set(h.get("en_dercat", [])) | {v for k, v in a.items() if k.isdigit() and k != "1"})
             elif name in ("cog", "cognate") and a.get("1") in ("en", "enm", "ang", "nl", "got", "non", "sv", "da") and a.get("2"):
                 h.setdefault("cog_" + a["1"], a["2"])
+        # the tree text only fills stages the templates lack (it is ambiguous when it has two branches, e.g. gehen)
+        for k, v in tree.items():
+            h.setdefault(k, v)
 
 
 def edges_derivbase(con, lex, add):
