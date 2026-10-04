@@ -32,8 +32,8 @@
   "z"
  ],
  "lemmas": 185172,
- "families": 14959,
- "game_words": 5116,
+ "families": 14882,
+ "game_words": 5115,
  "edges": {
   "deriv": 48561,
   "causative": 5,
@@ -42,43 +42,43 @@
   "wb": 17426,
   "ety_hint": 1394
  },
- "rejected_merges": 2495,
+ "rejected_merges": 2358,
  "queues": {
   "level_spread": {
    "total": 984,
    "in_game": 984
   },
   "multi_base": {
-   "total": 3273,
-   "in_game": 1956
+   "total": 3361,
+   "in_game": 2012
   },
   "single_link": {
-   "total": 5752,
-   "in_game": 5752
+   "total": 5783,
+   "in_game": 5783
   },
   "pie_single_source": {
-   "total": 458,
-   "in_game": 458
+   "total": 453,
+   "in_game": 453
   },
   "compound_single": {
    "total": 407,
    "in_game": 407
   },
   "no_history": {
-   "total": 2130,
-   "in_game": 2130
+   "total": 2098,
+   "in_game": 2098
   },
   "indirect": {
-   "total": 4284,
-   "in_game": 1780
+   "total": 4388,
+   "in_game": 1857
   },
   "ety_hint": {
    "total": 1394,
    "in_game": 337
   },
   "rejected": {
-   "total": 2495,
-   "in_game": 1517
+   "total": 2358,
+   "in_game": 1434
   },
   "pie_doubted": {
    "total": 7,
@@ -130,7 +130,7 @@
    {
     "check": "no family larger than 250 words (blob detector)",
     "ok": true,
-    "detail": "largest: halten (144)",
+    "detail": "largest: halten (146)",
     "kind": "hard"
    },
    {
@@ -160,7 +160,7 @@
    {
     "check": "only ship-licensed sources in history",
     "ok": true,
-    "detail": "Counter({'wikt_en': 4291, 'wikt_de': 1360, 'iecor': 8})",
+    "detail": "Counter({'wikt_en': 4251, 'wikt_de': 1354, 'iecor': 8})",
     "kind": "hard"
    },
    {
@@ -278,6 +278,24 @@
     "kind": "regression"
    },
    {
+    "check": "gehen and das Gehen are one family (conversion)",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "leben and das Leben are one family (conversion)",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "haben and das Haben are one family (conversion)",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
     "check": "gehen has English cognate go",
     "ok": true,
     "detail": "",
@@ -285,20 +303,20 @@
    }
   ],
   "metrics": {
-   "words": 5116,
-   "families": 3547,
-   "families_2plus": 747,
+   "words": 5115,
+   "families": 3501,
+   "families_2plus": 762,
    "bridges": 317,
-   "words_with_segments": 1569,
-   "words_with_forms": 3317,
-   "families_with_germanic_chain": 947,
-   "families_with_loan_origin": 851,
-   "history_stages_2plus_sources": 1427,
-   "history_stages_total": 4093,
+   "words_with_segments": 1614,
+   "words_with_forms": 3316,
+   "families_with_germanic_chain": 938,
+   "families_with_loan_origin": 848,
+   "history_stages_2plus_sources": 1421,
+   "history_stages_total": 4053,
    "pie_status": {
-    "null": 2986,
     "verified": 88,
-    "single_source": 458,
+    "null": 2945,
+    "single_source": 453,
     "doubted": 7,
     "conflict": 8
    },
@@ -307,12 +325,12 @@
     "A2": 1318,
     "B2": 745,
     "C2": 369,
-    "B1": 885,
+    "B1": 884,
     "C1": 359,
     "null": 414
    },
-   "english_cognates": 624,
-   "english_cognates_expert_checked": 75
+   "english_cognates": 617,
+   "english_cognates_expert_checked": 74
   }
  },
  "sources": {

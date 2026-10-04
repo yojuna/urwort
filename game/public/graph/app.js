@@ -108,7 +108,7 @@ async function viewOverview() {
   const groups = {};
   for (const c of checks) (groups[c.kind] ||= []).push(c);
   return `<section class="panel"><h1>The word graph</h1>
-    <p class="muted">Everything the pipeline builds, not only what the game uses. Generated ${esc(m.generated)}. Search any word above, or start with a review queue.</p>
+    <p class="muted">Everything the pipeline builds, not only what the game uses. Generated ${esc(m.generated)}. Search any word above, or start with a review queue. New here? Read the <a href="#/guide">guide</a>.</p>
     <div class="grid">
       <div class="tile"><b>${m.lemmas.toLocaleString()}</b><span class="small muted">lemmas</span></div>
       <div class="tile"><b>${m.families.toLocaleString()}</b><span class="small muted">families of 2+ words</span></div>
@@ -267,6 +267,57 @@ async function viewWord(word) {
     : w === f.root ? `<section class="panel"><h2>History</h2>${historyHtml(fid, f.root, f.history, f.pie, f.loan, f.cognates)}</section>` : ""}`;
 }
 
+
+function viewGuide() {
+  const P = (c, t) => `<span class="pill ${c}">${t}</span>`;
+  return `<section class="panel"><h1>How to use this viewer</h1>
+    <p>This viewer shows the whole word graph behind Urwort: every German word the pipeline knows, how words are grouped into families, where each link comes from, and the history of each root. Use it to understand the data and to mark what is right or wrong. Your marks become fixes in the pipeline.</p>
+    <h3>Ways in</h3>
+    <ul>
+      <li><b>Search</b> (top): type 2+ letters of any German word. Suggestions show game words first, then frequent words. Enter opens the top match.</li>
+      <li><b>Overview</b>: headline numbers, all build checks, the rules and the sources.</li>
+      <li><b>Queues</b>: lists of things most worth a human look, one kind per queue.</li>
+      <li><b>Links</b>: every word is a link to its word page; “family” links open the family page. Pages have shareable addresses, e.g. <span class="mono">#/w/fahren</span>.</li>
+    </ul></section>
+  <section class="panel"><h2>Family page</h2>
+    <p>A family is a group of words today’s speakers feel belong together (present-day word family): <span class="de">stehen, verstehen, Verständnis, Zustand…</span>. History is kept separately, underneath.</p>
+    <ul>
+      <li><b>Words and derivation links</b>: a tree from the root. Each word shows its parts (${'<span class="segs"><span class="prefix">ver</span><span class="root">steh</span><span class="suffix">en</span></span>'}: prefix, root, suffix), part of speech, estimated level, ${P("game", "game")} if the game uses it, key forms (article, plural, past…), and “from <i>base</i>” with the sources behind that link.</li>
+      <li><b>Show all</b>: by default big families show only game words; tick it to see all members. Faded rows lead to game words but are not used by the game.</li>
+      <li><b>History</b>: older forms of the root, newest at the bottom (Middle High German → Proto-Germanic), each with its sources; Proto-Indo-European with every source’s claim; loan origin; cognates.</li>
+      <li><b>All links</b>: every link touching the family, filterable by kind: derivation, compound head/modifier, causative pair (<span class="de">legen/liegen</span>), history hint (<span class="de">fertig ~ Fahrt</span>), untyped word list. “other family” marks links that leave the family.</li>
+      <li><b>Blocked merges</b>: one-source links the safety rule stopped from joining this family with another. If one is right, the two families should be one.</li>
+      <li><b>Graph</b>: teal lines = derivation (thick = 2+ sources), ochre dashed = compounds, red dashed = blocked merges. Filled dots are game words. Drag, pinch to zoom, tap a word to open it.</li>
+    </ul></section>
+  <section class="panel"><h2>Word page</h2>
+    <ul>
+      <li><b>Header</b>: part of speech, estimated level, whether the game uses it, frequency rank, IPA, ▶ listen (Wikimedia Commons recording), word parts, key forms and the number of inflected forms known.</li>
+      <li><b>Meanings</b>: English glosses (English Wiktionary) and German definitions (German Wiktionary).</li>
+      <li><b>Level evidence</b>: one row per input. Deutsch im Blick = chapter in a first-year course (1–5 → A1, 6–10 → A2); MERLIN = lowest level at which 2+ learners used the word; Subtitles = frequency rank in film subtitles (1k/2k/4k/8k/16k → A1…C1). The outlined box is the result. Levels are estimates, not official CEFR.</li>
+      <li><b>Place in the family</b>: its base with sources, other candidate bases, and every link of the word.</li>
+      <li><b>Own history</b>: when the word has an etymology of its own (not just its root’s).</li>
+    </ul></section>
+  <section class="panel"><h2>Reading the labels</h2>
+    <div class="scroll"><table>
+      <tr><td>${P("s2", "DErivBase")} ${P("s2", "de Wiktionary")}</td><td>green: the link or stage has 2+ independent sources</td></tr>
+      <tr><td>${P("s1", "MorphyNet")}</td><td>ochre: only one source; about 95% of these were right in a sample</td></tr>
+      <tr><td>${P("s1", "indirect")}</td><td>in the family through another member, with no direct link to this base</td></tr>
+      <tr><td>${P("bad", "sources disagree")}</td><td>red: a conflict, a doubt, or a missing source</td></tr>
+      <tr><td>${P("lv", "A2")}</td><td>estimated level</td></tr>
+      <tr><td>${P("game", "game")}</td><td>used by the game (the 5,000 most frequent words)</td></tr>
+      <tr><td>${P("s2", "verified (2+ sources)")}</td><td>Proto-Indo-European root confirmed by two independent sources; only these show in the game</td></tr>
+      <tr><td>${P("bad", "origin beyond uncertain")}</td><td>Wiktionary marks the etymology before this stage as uncertain</td></tr>
+    </table></div>
+    <h3>Sources</h3>
+    <p class="small">en/de Wiktionary (via kaikki.org) · reconstruction page = Wiktionary’s Proto-Germanic/Proto-Indo-European entries · DErivBase (grammar-based derivation rules) · MorphyNet (Wiktionary-derived derivations, never used alone) · IE-CoR (expert cognate database) · UniMorph (inflected forms) · Deutsch im Blick, MERLIN, subtitles (levels).</p></section>
+  <section class="panel"><h2>Reviewing</h2>
+    <ul>
+      <li>Tap <b>✓</b> if a link, stage, root or grouping is right, <b>✗</b> if wrong. Tap again to undo. Each family also has a free-text note.</li>
+      <li>Marks are saved in this browser only. Open <b>Review</b> to see them, <b>Export review</b> to download a file, and send that file to Claude to apply the fixes. <b>Import</b> continues on another device.</li>
+      <li>Good places to start: Queues → Blocked merges, Indirect members, Single-source links. Game words come first.</li>
+    </ul></section>`;
+}
+
 function viewReview() {
   const items = Object.entries(review).sort((a, b) => (b[1].at || "").localeCompare(a[1].at || ""));
   const bad = items.filter(([, v]) => v.verdict === "bad").length;
@@ -283,7 +334,7 @@ async function route() {
   const h = decodeURIComponent(location.hash.slice(1) || "/");
   const [, a, ...rest] = h.split("/"); const b = rest.join("/");
   document.querySelectorAll(".tabs a").forEach(t => t.removeAttribute("aria-current"));
-  const tab = a === "" ? "overview" : a === "queues" || a === "q" ? "queues" : a === "review" ? "review" : null;
+  const tab = a === "" ? "overview" : a === "queues" || a === "q" ? "queues" : a === "review" ? "review" : a === "guide" ? "guide" : null;
   if (tab) $(`.tabs a[data-tab="${tab}"]`).setAttribute("aria-current", "page");
   const view = $("#view");
   try {
@@ -293,6 +344,7 @@ async function route() {
     else if (a === "f") { view.innerHTML = await viewFamily(b); drawGraph(await family(b)); }
     else if (a === "w") view.innerHTML = await viewWord(b);
     else if (a === "review") view.innerHTML = viewReview();
+    else if (a === "guide") view.innerHTML = viewGuide();
     else view.innerHTML = await viewOverview();
   } catch (err) { view.innerHTML = `<section class="panel"><p>Could not load this view: ${esc(err.message)}</p></section>`; }
   window.scrollTo({ top: 0 });

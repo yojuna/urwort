@@ -90,3 +90,5 @@ textarea{width:100%;border:1px solid var(--rule);border-radius:7px;background:va
 .play{border-radius:999px;padding:3px 10px}
 .notice{border-left:3px solid var(--warn);padding:6px 10px;background:var(--stratum-soft);border-radius:4px;font-size:.84rem}
 .word{font-family:var(--display);font-size:2rem}
+.tabs{flex-wrap:wrap}
+.panel > ul:not(.tree){margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px}
