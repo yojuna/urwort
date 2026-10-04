@@ -113,3 +113,14 @@ Verified: `npm run build` passes, and the page loads 5,116 words with no console
   (check only): 32% exact, 76% within one level. Inputs are commercial-safe: Deutsch im Blick chapter (1–5 A1, 6–10 A2),
   subtitle frequency per lemma on a doubling scale (1k/2k/4k/8k/16k), first level used in ≥2 MERLIN texts, and a family cap
   (a word is at most one level above its parts; Bauer & Nation 1993). Shown as an *estimated* level, not official CEFR.
+
+## Viewer (graph explorer and review tool)
+
+```bash
+.venv/bin/python review_export.py    # full graph -> out/review (wipes the folder)
+.venv/bin/python explore_export.py   # game slice + map layout -> out/review/explore.json (run after review_export)
+```
+
+Deployed at https://yojuna.github.io/urwort/graph/ from the `pages-deploy` branch: `viewer/{index.html,app.js,explore.js,viewer.css}`
+plus `out/review` copied to `game/public/graph/data`. Explore (map, charts, words, affixes) shows the game data; Overview,
+Queues and Review cover the whole graph. The Guide tab explains every screen.

@@ -279,6 +279,13 @@ function viewGuide() {
       <li><b>Queues</b>: lists of things most worth a human look, one kind per queue.</li>
       <li><b>Links</b>: every word is a link to its word page; “family” links open the family page. Pages have shareable addresses, e.g. <span class="mono">#/w/fahren</span>.</li>
     </ul></section>
+  <section class="panel"><h2>Explore (the game data)</h2>
+    <ul>
+      <li><b>Map</b>: every word family the game uses, as a bubble sized by its number of game words. Colour = origin: blue native Germanic, orange loanword, green no history yet. A black ring = Proto-Indo-European root verified. Lines are compounds joining two families. Linked families form the island at the top; families without compound links sit in rows below, by origin. Tap a bubble for its words, history summary and compound neighbours; tap a legend chip to hide an origin; “Find a word” flies to its family.</li>
+      <li><b>Charts</b>: levels, parts of speech, origins, loan languages, history depth, PIE status, family sizes, link evidence, top prefixes and suffixes. Hover for exact numbers; tap a bar to list those words.</li>
+      <li><b>Words</b>: all game words in a sortable table (word, level, parts, family, family size game/all, base, number of sources, origin, meaning, frequency rank) with filters. Chart taps arrive here as filters you can remove.</li>
+      <li><b>Affixes</b>: every prefix and suffix in the game words with counts; tap one for its words.</li>
+    </ul></section>
   <section class="panel"><h2>Family page</h2>
     <p>A family is a group of words today’s speakers feel belong together (present-day word family): <span class="de">stehen, verstehen, Verständnis, Zustand…</span>. History is kept separately, underneath.</p>
     <ul>
@@ -334,11 +341,12 @@ async function route() {
   const h = decodeURIComponent(location.hash.slice(1) || "/");
   const [, a, ...rest] = h.split("/"); const b = rest.join("/");
   document.querySelectorAll(".tabs a").forEach(t => t.removeAttribute("aria-current"));
-  const tab = a === "" ? "overview" : a === "queues" || a === "q" ? "queues" : a === "review" ? "review" : a === "guide" ? "guide" : null;
+  const tab = a === "" || a === "x" ? "explore" : a === "overview" ? "overview" : a === "queues" || a === "q" ? "queues" : a === "review" ? "review" : a === "guide" ? "guide" : null;
   if (tab) $(`.tabs a[data-tab="${tab}"]`).setAttribute("aria-current", "page");
   const view = $("#view");
   try {
-    if (!a) view.innerHTML = await viewOverview();
+    if (!a || a === "x") { const [sub, query] = (b || "").split("?"); await Explore.show(view, sub, query); return; }
+    else if (a === "overview") view.innerHTML = await viewOverview();
     else if (a === "queues") view.innerHTML = viewQueues();
     else if (a === "q") view.innerHTML = await viewQueue(b);
     else if (a === "f") { view.innerHTML = await viewFamily(b); drawGraph(await family(b)); }
