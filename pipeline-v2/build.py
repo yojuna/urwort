@@ -240,10 +240,13 @@ def main():
               and len(e["sources"]) >= MIN_SUPPORT and e["sources"] != {"morphynet"}]  # MorphyNet alone: noisy
     for b, d, e in usable:
         if len(e["sources"]) >= 2: join(b, d)
+    # Conversion between case twins (gehen -> das Gehen, gut -> das Gut, Leben -> leben) is fully regular in German
+    # (Fleischer & Barz 2012: Konversion), so such a link may merge families even with one source.
+    def case_twins(a, b): return a != b and a.casefold() == b.casefold()
     rejected = []  # single-source links that would have merged two families: kept for review
     for b, d, e in usable:
         if len(e["sources"]) != 1: continue
-        if comp_size(b) == 1 or comp_size(d) == 1: join(b, d)
+        if comp_size(b) == 1 or comp_size(d) == 1 or case_twins(b, d): join(b, d)
         elif dsu.find(b) != dsu.find(d): rejected.append((b, d, e))
     members = collections.defaultdict(list)
     for w in dsu.p:

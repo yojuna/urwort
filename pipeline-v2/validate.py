@@ -97,6 +97,9 @@ REG = [
     ("Haus has no Proto-Iranian loan claim", fam("Haus")["borrowed_from"] is None),
     ("fahren principal parts fährt/fuhr/gefahren", (W["fahren"]["forms"] or {}).get("past_3sg") == "fuhr"),
     ("Haus is neuter, plural Häuser", (W["Haus"]["forms"] or {}).get("plural") == "Häuser"),
+    ("gehen and das Gehen are one family (conversion)", same("gehen", "Gehen") if "Gehen" in W else True),
+    ("leben and das Leben are one family (conversion)", same("leben", "Leben")),
+    ("haben and das Haben are one family (conversion)", same("haben", "Haben") if "Haben" in W else True),
     ("gehen has English cognate go", (fam("gehen")["cognates"].get("en") or {}).get("form") == "go"),
 ]
 for name, ok in REG:
