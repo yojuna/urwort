@@ -48,3 +48,4 @@ game/dist/
 *.log
 pipeline-v2/out/
 pipeline-v2/.venv/
+pipeline-v2/viewer/data/
