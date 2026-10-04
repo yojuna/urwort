@@ -6,98 +6,23 @@
 <title>Urwort Graph Viewer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>
-:root{
-  --bg:#f3f5f4; --paper:#fff; --fg:#1d2a2e; --muted:#5c6b70; --rule:#d5dedd;
-  --accent:#1f6f6b; --accent-soft:#dcecea; --stratum:#8a6a2f; --stratum-soft:#f1e8d6;
-  --ok:#2e7d4f; --ok-soft:#dff0e5; --bad:#a3322b; --bad-soft:#f6dedb; --warn:#a46a0b; --chip:#e8eeed;
-  --display:"Spectral",Georgia,serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
-  color-scheme:light;
-}
-@media (prefers-color-scheme: dark){:root{
-  --bg:#121a1c; --paper:#182326; --fg:#e3ecea; --muted:#9db0b2; --rule:#2c3b3e;
-  --accent:#5fc0b8; --accent-soft:#1d3634; --stratum:#d6b06a; --stratum-soft:#2d2618;
-  --ok:#6fcf97; --ok-soft:#173326; --bad:#f08a80; --bad-soft:#3a1d1a; --warn:#e2b04a; --chip:#22302f; color-scheme:dark}}
-*{box-sizing:border-box}
-html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font:14px/1.55 var(--body);padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
-header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--rule);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-header h1{font:600 1.15rem/1.2 var(--display);margin:0;margin-right:auto}
-#q{flex:1 1 220px;min-width:0;font:inherit;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--fg)}
-button{font:inherit;cursor:pointer;border:1px solid var(--rule);background:var(--paper);color:var(--fg);border-radius:7px;padding:6px 10px}
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-main{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:16px;max-width:1280px;margin:0 auto}
-@media (min-width:980px){main{grid-template-columns:340px minmax(0,1fr)}}
-.panel{background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
-h2{font:600 1.05rem/1.3 var(--display);margin:0}
-h3{font:600 .78rem/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:6px 0 0}
-.muted{color:var(--muted)} .small{font-size:.82rem}
-.mono{font-family:var(--mono);font-size:.86em}
-.de{font-family:var(--display);font-style:italic;font-size:1.05em}
-.recon{font-family:var(--display);font-style:italic;color:var(--stratum)}
-.pill{display:inline-block;font:500 .7rem/1 var(--body);padding:3px 6px;border-radius:999px;background:var(--chip);color:var(--muted);white-space:nowrap;margin:1px 2px 1px 0}
-.pill.src{background:var(--accent-soft);color:var(--accent)}
-.pill.s2{background:var(--ok-soft);color:var(--ok)}
-.pill.s1{background:var(--stratum-soft);color:var(--stratum)}
-.pill.bad{background:var(--bad-soft);color:var(--bad)}
-.pill.lv{background:var(--fg);color:var(--bg)}
-.filters{display:flex;flex-wrap:wrap;gap:6px}
-.filters button[aria-pressed="true"]{background:var(--accent);color:var(--paper);border-color:var(--accent)}
-select{font:inherit;padding:5px;border-radius:7px;border:1px solid var(--rule);background:var(--paper);color:var(--fg)}
-#famlist{list-style:none;margin:0;padding:0;max-height:60vh;overflow:auto;border-top:1px solid var(--rule)}
-#famlist li{padding:7px 4px;border-bottom:1px solid var(--rule);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
-#famlist li:hover,#famlist li[aria-current="true"]{background:var(--accent-soft)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
-.stat{border:1px solid var(--rule);border-radius:8px;padding:8px}
-.stat b{display:block;font:600 1.15rem/1.1 var(--display);font-variant-numeric:tabular-nums}
-.tree{list-style:none;margin:0;padding:0}
-.tree ul{list-style:none;margin:0;padding-left:18px;border-left:1px dashed var(--rule)}
-.node{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--rule)}
-.node .lemma{font-weight:600;cursor:pointer}
-.segs{display:inline-flex;gap:1px;font-family:var(--mono);font-size:.82rem}
-.segs span{padding:1px 4px;border-radius:4px;background:var(--chip)}
-.segs .prefix{background:#dfe7f3;color:#2b4a74} .segs .root{background:var(--accent-soft);color:var(--accent)} .segs .suffix{background:var(--stratum-soft);color:var(--stratum)}
-@media (prefers-color-scheme: dark){.segs .prefix{background:#1f2a3a;color:#9fbbe0}}
-.gloss{flex-basis:100%;font-size:.84rem;color:var(--muted)}
-.review{display:inline-flex;gap:4px;margin-left:auto}
-.review button{padding:2px 8px;font-size:.8rem}
-.review button[data-on="ok"]{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
-.review button[data-on="bad"]{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
-.strata{display:flex;flex-direction:column;gap:0;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
-.stage{display:grid;grid-template-columns:minmax(120px,170px) minmax(0,1fr) auto;gap:8px;padding:8px 10px;background:var(--stratum-soft);border-bottom:1px solid var(--rule);align-items:center}
-.stage:nth-child(even){filter:brightness(.98)}
-.stage .lang{color:var(--muted);font-size:.82rem}
-@media (max-width:560px){.stage{grid-template-columns:minmax(0,1fr) auto}.stage .lang{grid-column:1/-1}}
-table{border-collapse:collapse;width:100%;font-size:.84rem}
-td,th{text-align:left;padding:5px 8px 5px 0;border-bottom:1px solid var(--rule);vertical-align:top}
-th{color:var(--muted);font-weight:500}
-.scroll{overflow-x:auto}
-#graph{width:100%;height:420px;border:1px solid var(--rule);border-radius:8px;background:var(--bg)}
-#graph text{font:12px var(--body);fill:var(--fg);pointer-events:none}
-a{color:var(--accent)}
-textarea{width:100%;font:inherit;border:1px solid var(--rule);border-radius:7px;background:var(--paper);color:var(--fg);padding:6px}
-.notice{border-left:3px solid var(--warn);padding:6px 10px;background:var(--stratum-soft);border-radius:4px;font-size:.84rem}
-</style>
+<link rel="stylesheet" href="viewer.css">
 </head>
 <body>
-<header>
-  <h1>Urwort Graph Viewer</h1>
-  <input id="q" list="words" placeholder="Search a German word (e.g. fahren, Wohnung)" autocomplete="off" aria-label="Search a word">
-  <datalist id="words"></datalist>
-  <button id="reviewBtn" title="Your review marks">Review: <span id="reviewCount">0</span></button>
+<header class="top">
+  <a class="brand" href="#/">Urwort <span>Graph Viewer</span></a>
+  <div class="search">
+    <input id="q" type="search" placeholder="Search any German word…" autocomplete="off" spellcheck="false" aria-label="Search a word" aria-controls="sugg" aria-expanded="false">
+    <ul id="sugg" role="listbox" hidden></ul>
+  </div>
+  <nav class="tabs" aria-label="Sections">
+    <a href="#/" data-tab="overview">Overview</a>
+    <a href="#/queues" data-tab="queues">Queues</a>
+    <a href="#/review" data-tab="review">Review <span id="rc" class="count">0</span></a>
+  </nav>
 </header>
-<main>
-  <aside class="panel" aria-label="Families">
-    <div class="stats" id="stats"></div>
-    <h3>Browse families</h3>
-    <div class="filters" id="filters"></div>
-    <label class="small muted">Sort
-      <select id="sort"><option value="weight">most frequent</option><option value="size">largest</option><option value="alpha">A–Z</option></select>
-    </label>
-    <ul id="famlist" aria-label="Family list"></ul>
-  </aside>
-  <section class="panel" id="detail" aria-live="polite"><p class="muted">Loading data…</p></section>
-</main>
+<main id="view" aria-live="polite"><p class="muted">Loading…</p></main>
+<audio id="player" preload="none"></audio>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="app.js"></script>
 </body>

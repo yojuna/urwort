@@ -240,8 +240,11 @@ def main():
               and len(e["sources"]) >= MIN_SUPPORT and e["sources"] != {"morphynet"}]  # MorphyNet alone: noisy
     for b, d, e in usable:
         if len(e["sources"]) >= 2: join(b, d)
+    rejected = []  # single-source links that would have merged two families: kept for review
     for b, d, e in usable:
-        if len(e["sources"]) == 1 and (comp_size(b) == 1 or comp_size(d) == 1): join(b, d)
+        if len(e["sources"]) != 1: continue
+        if comp_size(b) == 1 or comp_size(d) == 1: join(b, d)
+        elif dsu.find(b) != dsu.find(d): rejected.append((b, d, e))
     members = collections.defaultdict(list)
     for w in dsu.p:
         members[dsu.find(w)].append(w)
@@ -251,6 +254,7 @@ def main():
       CREATE TABLE lexeme(word PRIMARY KEY, pos, src, family);
       CREATE TABLE edge(base, derived, kind, sources, n_sources INT, info);
       CREATE TABLE history(word PRIMARY KEY, data);
+      CREATE TABLE rejected(base, derived, sources, info);
     """)
     fam_of = {w: root for root, ms in members.items() for w in ms}
     out.executemany("INSERT INTO lexeme VALUES (?,?,?,?)",
@@ -258,6 +262,8 @@ def main():
     out.executemany("INSERT INTO edge VALUES (?,?,?,?,?,?)",
                     [(b, d, k, ",".join(sorted(e["sources"])), len(e["sources"]), json.dumps(e["info"], ensure_ascii=False) or None)
                      for (b, d, k), e in edges.items()])
+    out.executemany("INSERT INTO rejected VALUES (?,?,?,?)",
+                    [(b, d, ",".join(sorted(e["sources"])), json.dumps(e["info"], ensure_ascii=False)) for b, d, e in rejected])
     out.executemany("INSERT INTO history VALUES (?,?)",
                     [(w, json.dumps(h, ensure_ascii=False)) for w, h in hist.items() if h])
     out.executescript("CREATE INDEX e_b ON edge(base); CREATE INDEX e_d ON edge(derived); CREATE INDEX l_f ON lexeme(family);")
