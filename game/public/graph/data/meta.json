@@ -1,0 +1,335 @@
+{
+ "audio_base": "https://commons.wikimedia.org/wiki/Special:FilePath/",
+ "generated": "2026-10-04",
+ "buckets": 512,
+ "letters": [
+  "_",
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z"
+ ],
+ "lemmas": 185172,
+ "families": 14959,
+ "game_words": 5116,
+ "edges": {
+  "deriv": 48561,
+  "causative": 5,
+  "compound_head": 78872,
+  "compound_mod": 81969,
+  "wb": 17426,
+  "ety_hint": 1394
+ },
+ "rejected_merges": 2495,
+ "queues": {
+  "level_spread": {
+   "total": 984,
+   "in_game": 984
+  },
+  "multi_base": {
+   "total": 3273,
+   "in_game": 1956
+  },
+  "single_link": {
+   "total": 5752,
+   "in_game": 5752
+  },
+  "pie_single_source": {
+   "total": 458,
+   "in_game": 458
+  },
+  "compound_single": {
+   "total": 407,
+   "in_game": 407
+  },
+  "no_history": {
+   "total": 2130,
+   "in_game": 2130
+  },
+  "indirect": {
+   "total": 4284,
+   "in_game": 1780
+  },
+  "ety_hint": {
+   "total": 1394,
+   "in_game": 337
+  },
+  "rejected": {
+   "total": 2495,
+   "in_game": 1517
+  },
+  "pie_doubted": {
+   "total": 7,
+   "in_game": 7
+  },
+  "pie_conflict": {
+   "total": 8,
+   "in_game": 8
+  }
+ },
+ "validation": {
+  "results": [
+   {
+    "check": "every word belongs to an existing family",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "every family member is an exported word",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "no word in two families",
+    "ok": true,
+    "detail": "0 duplicates",
+    "kind": "hard"
+   },
+   {
+    "check": "family root is a member",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "roots have no base inside their family",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "derivation tree has no cycles",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "no family larger than 250 words (blob detector)",
+    "ok": true,
+    "detail": "largest: halten (144)",
+    "kind": "hard"
+   },
+   {
+    "check": "no particle is a family base",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "segments re-assemble to the word",
+    "ok": true,
+    "detail": "0 bad: []",
+    "kind": "hard"
+   },
+   {
+    "check": "every bridge links exported words or lexicon words",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "every history stage has a source",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "only ship-licensed sources in history",
+    "ok": true,
+    "detail": "Counter({'wikt_en': 4291, 'wikt_de': 1360, 'iecor': 8})",
+    "kind": "hard"
+   },
+   {
+    "check": "only ship-licensed sources in PIE claims",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "no check-only source in any provenance field",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "license and sources declared",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "PIE shown only when verified by 2+ independent sources",
+    "ok": true,
+    "detail": "88 shown",
+    "kind": "hard"
+   },
+   {
+    "check": "doubted / conflicting PIE never shown",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "loans from proto-languages are not asserted",
+    "ok": true,
+    "detail": "",
+    "kind": "hard"
+   },
+   {
+    "check": "fahren and Fahrer are one family",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "fahren and führen are not (causative pair = bridge)",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "gewinnen and wohnen are separate surface families",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "Schalter is not with schade",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "verstehen = ver·steh·en",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "Wohnung = Wohn·ung",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "Haus goes back to Proto-Germanic *hūsą",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "stehen: PIE *steh₂- verified",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "lang: conflicting/doubted PIE not verified",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "Fenster borrowed from Latin fenestra",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "Haus has no Proto-Iranian loan claim",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "fahren principal parts fährt/fuhr/gefahren",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "Haus is neuter, plural Häuser",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   },
+   {
+    "check": "gehen has English cognate go",
+    "ok": true,
+    "detail": "",
+    "kind": "regression"
+   }
+  ],
+  "metrics": {
+   "words": 5116,
+   "families": 3547,
+   "families_2plus": 747,
+   "bridges": 317,
+   "words_with_segments": 1569,
+   "words_with_forms": 3317,
+   "families_with_germanic_chain": 947,
+   "families_with_loan_origin": 851,
+   "history_stages_2plus_sources": 1427,
+   "history_stages_total": 4093,
+   "pie_status": {
+    "null": 2986,
+    "verified": 88,
+    "single_source": 458,
+    "doubted": 7,
+    "conflict": 8
+   },
+   "levels": {
+    "A1": 1026,
+    "A2": 1318,
+    "B2": 745,
+    "C2": 369,
+    "B1": 885,
+    "C1": 359,
+    "null": 414
+   },
+   "english_cognates": 624,
+   "english_cognates_expert_checked": 75
+  }
+ },
+ "sources": {
+  "derivbase": "DErivBase 2.0, Zeller/Šnajder/Padó 2013, CC BY-SA 3.0",
+  "wikt_en": "English Wiktionary via kaikki.org (Ylonen 2022), CC BY-SA 4.0",
+  "wikt_de": "German Wiktionary via kaikki.org, CC BY-SA 4.0",
+  "morphynet": "MorphyNet, Batsuren et al. 2021, CC BY-SA 3.0",
+  "wordfreq": "wordfreq 3, Speer 2022, CC BY-SA 4.0"
+ },
+ "rules": {
+  "pie": "shown only when English and German Wiktionary both give a PIE root (status 'verified')",
+  "families": "present-day derivation families; compounds and causatives are bridges"
+ },
+ "precision_sample": {
+  "deriv_1src": "57/60",
+  "deriv_2plus": "60/60",
+  "compound_head": "34/40",
+  "note": "hand-review of a random sample (seed 42), one reviewer, 2026-10-03"
+ }
+}
