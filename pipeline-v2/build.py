@@ -103,8 +103,10 @@ def edges_wikt_de(con, lex, add, hist):
             h.setdefault("de_pie", m.group(1).replace(" ", ""))
         # "mittelhochdeutsch varn ^(→ gmh), althochdeutsch faran": a second source for the medieval stages
         for stage, name in (("gmh", "mittelhochdeutsch"), ("goh", "althochdeutsch")):
-            if m := re.search(rf"(?<![a-zä]){name}\s+(?:[„»\"])?([^\s,;^(„“»«\"]+)", text):
-                h.setdefault("de_" + stage, m.group(1))
+            # "mittelhochdeutsch und althochdeutsch „man“": both stages share the form after the second name
+            if m := re.search(rf"(?<![a-zä]){name}\s+(?:(?:und|oder|bzw\.)\s+[a-zä]+deutsch\s+)?(?:[„»\"])?([^\s,;^(„“»«\"]+)", text):
+                if m.group(1) not in ("und", "oder", "bzw.", "von", "zu", "aus", "mit", "vgl.", "siehe", "auch", "in", "der", "die", "das"):
+                    h.setdefault("de_" + stage, m.group(1))
         for d in json.loads(derived) if derived else []:
             if d in lex and d != word:
                 add(word, d, "wb", "wikt_de_wb", None)
