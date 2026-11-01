@@ -1,0 +1,20 @@
+{
+  "name": "urwort-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "ink": "node scripts/compile-ink.mjs",
+    "dev": "npm run ink && vite",
+    "build": "npm run ink && tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "inkjs": "^2.4.0",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}
