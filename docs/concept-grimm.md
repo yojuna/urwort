@@ -22,7 +22,7 @@ by working out what words mean from their roots, not from lessons.
    languages, borrowed words, compounds, Proto-Indo-European roots, forms, levels, audio.
 4. **German history and culture, implicitly**, through the frame story and the tales.
 
-Audience: learners with some German (about A2 and up) and etymology fans. Mobile first, 2.5D.
+Audience: learners with some German (about A2 and up) and etymology fans. Mobile first, 2.5D as a 3/4 top-down pixel-art world.
 
 ## Two layers
 
@@ -101,12 +101,17 @@ violent. Decide content rules before writing.
   premise. Runner-up: *Hänsel und Gretel* (1812). See `research/grimm/coverage.md`.
 - **Mechanics:** affix runes (3–4 affixes), root inference, word slips, one sound-shift lens,
   one small ruin with an older inscription, one traveller.
-- **Size:** 60–100 words from 3 strong families. Placeholder art in 2.5D.
+- **Size:** 60–100 words from 3 strong families. Placeholder pixel art, 3/4 top-down.
 - **Test:** is it fun for 15 minutes, and can a player infer new words afterwards?
 
 ## Production
 
-- **Stack:** Three.js with a fixed angled (orthographic) camera for 2.5D, so 3D stays possible later.
+- **Stack (decided 2026-11-21):** Phaser 4 + LDtk (maps) + inkjs (dialogue) + an HTML overlay for all text UI,
+  TypeScript/Vite PWA. The view is 3/4 top-down (Stardew/Eastward-style depth sorting), not isometric
+  (LDtk has no isometric mode) and not HD-2D (that needs a 3D engine). Why: the game is text-heavy, and HTML gives
+  crisp German text and accessibility; small bundle for mobile; ink runs natively; headless play-testing works.
+  The world renderer stays one module (`client/src/world.ts`), so it could be swapped later without touching
+  story, data or UI. Godot was considered and rejected (heavy web export, canvas-only text, weak ink support on web).
   Data from `data/urwort-v4.json` plus a new tale corpus.
 - **Dialogue is the bottleneck.** Tale texts give narration; frame dialogue must be written.
   Proposal: AI-drafted lines limited to the player's known words at that point, then human-reviewed.
@@ -121,6 +126,6 @@ violent. Decide content rules before writing.
 ## Open questions
 
 1. Content rules for violence and antisemitic material in the first editions.
-2. How dialogue gets written (AI-drafted with review, or by hand).
-3. Confirm the slice tale (recommended: Rumpelstilzchen).
-4. Art direction for 2.5D (woodcut/engraving, Biedermeier watercolour, Ludwig Richter-like?).
+2. ~~How dialogue gets written~~: AI-drafted, reviewed by the user (decided 2026-10-31).
+3. ~~Slice tale~~: Rumpelstilzchen 1812, as one slice of many (decided 2026-10-31).
+4. Art direction: 3/4 top-down pixel art; Ludwig Richter and Biedermeier palettes as inspiration, made later with our own tools. CC0/generic placeholders until then.

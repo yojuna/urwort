@@ -42,7 +42,8 @@ See **[Dev Tooling](docs/dev_tooling.md)** for the full reference.
 
 ```
 urwort/
-├── game/               # Three.js game client (TypeScript + Vite)
+├── client/             # new game client: Phaser 4 + inkjs + Vite (Grimm concept, see docs/concept-grimm.md)
+├── game/               # old Three.js game client (still live; replaced by client/)
 ├── tools/              # Data pipeline scripts (Python)
 │   ├── build-db.py     # FreeDict + Kaikki + IPA + CEFR → SQLite
 │   ├── export-ontology.py  # DB + Kaikki → ontology.json
@@ -66,7 +67,8 @@ urwort/
 
 | Component | Technology |
 |-----------|-----------|
-| Game client | TypeScript, Three.js, Vite |
+| Game client (new, `client/`) | TypeScript, Phaser 4, inkjs, LDtk, Vite |
+| Old game client (`game/`) | TypeScript, Three.js, Vite |
 | Data pipeline | Python 3.11+, SQLite |
 | API server | FastAPI, Uvicorn |
 | Dev environment | Docker Compose |

@@ -61,9 +61,9 @@ export class World extends Phaser.Scene implements StoryHost {
     this.events.once('shutdown', () => this.scale.off('resize', fit));
     cam.startFollow(this.player, true, 0.15, 0.15);
     cam.setBackgroundColor(this.def.tale ? '#1b1712' : '#2b2620');
-    if (this.def.tale && cam.postFX) {
-      cam.postFX.addColorMatrix().sepia();
-      cam.postFX.addVignette(0.5, 0.5, 0.9, 0.35);
+    if (this.def.tale && cam.filters) {
+      cam.filters.external.addColorMatrix().colorMatrix.sepia();
+      cam.filters.external.addVignette(0.5, 0.5, 0.9, 0.2);
     }
     cam.fadeIn(400);
 

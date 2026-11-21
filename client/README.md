@@ -22,7 +22,7 @@ npm run build      # ink + typecheck + build -> dist/ (relative paths, deployabl
 |---|---|
 | `src/story/main.ink` | All dialogue, in [Ink](https://github.com/inkle/ink). **Draft, AI-written, needs review.** Tags drive the game (see the file header). |
 | `src/maps.ts` | Placeholder maps as character grids, plus NPCs, objects, exits and scripted scene starts. |
-| `src/world.ts` | The explorable world (Phaser 3): tap-to-move with pathfinding, arrow keys/WASD, interaction, scene changes, tale tint. |
+| `src/world.ts` | The explorable world (Phaser 4, 3/4 top-down): tap-to-move with pathfinding, arrow keys/WASD, interaction, scene changes, tale tint. |
 | `src/story.ts` | Runs ink knots through the dialogue box and turns tags into actions (slips, runes, items, puzzles, scenes). |
 | `src/ui/` | HTML overlay: dialogue with tappable words, slip box, word cards, rune bench, title cards. |
 | `src/art.ts` | Placeholder pixel art drawn in code (no asset files, no licences to track). Replaced in the art stage. |
