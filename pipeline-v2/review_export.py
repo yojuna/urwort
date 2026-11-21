@@ -87,12 +87,7 @@ def main():
         for w in s - set(tree): tree[w] = (root, None)
         return tree
 
-    rank = {}
-    by_fold = collections.defaultdict(list)
-    for w in lex: by_fold[w.casefold()].append(w)
-    for tok in X.top_n_list("de", 200000):
-        for w in by_fold.get(tok, []):
-            if w not in rank: rank[w] = len(rank) + 1
+    rank = {w: i for i, w in enumerate(X.freq.ranked(lex), 1)}
 
     def own_history(w):
         h = hist.get(w)

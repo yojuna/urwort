@@ -3,7 +3,7 @@
   out/urwort-v4.json        canonical data (families, words, bridges, history, provenance)
   game/public/ontology.json the same data in the current client's v3 format (with --game)
 
-Scope: the N most frequent German content lemmas (wordfreq), plus each family's root.
+Scope: the N most frequent German content lemmas (wordfreq, case-aware: see freq.py), plus each family's root.
 Rules (decided with the user, 2026-10-03):
   - families are present-day (synchronic); history is a separate layer
   - Proto-Indo-European is shown only when two independent sources give it
@@ -13,7 +13,8 @@ Usage: .venv/bin/python export.py [--n 5000] [--game]
 """
 import argparse, json, re, sqlite3, collections, datetime, unicodedata
 from pathlib import Path
-from wordfreq import top_n_list, zipf_frequency
+import freq
+from freq import zipf
 
 HERE = Path(__file__).resolve().parent
 G = sqlite3.connect(HERE / "out" / "graph.db")
@@ -30,9 +31,6 @@ LANG_NAMES = {"gmh": "Middle High German", "goh": "Old High German", "gmw-pro": 
 STAGE_ORDER = ["ine-pro", "gem-pro", "gmw-pro", "goh", "gmh"]  # oldest first
 POS_MAP = {"noun": "NOUN", "verb": "VERB", "adj": "ADJ", "adv": "ADV"}
 INSEPARABLE = ("be", "ge", "er", "ver", "zer", "ent", "emp", "miss", "un", "ur")
-
-
-def zipf(w): return zipf_frequency(w, "de")
 
 
 def load():
@@ -219,15 +217,9 @@ def main():
     lex, hist, edges = load()
 
     # scope: top-N content lemmas by frequency
-    by_fold = collections.defaultdict(list)
-    for w in lex: by_fold[w.casefold()].append(w)
-    scope, rank = [], {}
-    for tok in top_n_list("de", 80000):
-        for w in by_fold.get(tok, []):
-            if w not in rank:
-                rank[w] = len(scope) + 1; scope.append(w)
-        if len(scope) >= args.n: break
-    scope = scope[:args.n]; scope_set = set(scope)
+    scope = freq.ranked(lex, depth=80000)[:args.n]
+    rank = {w: i for i, w in enumerate(scope, 1)}
+    scope_set = set(scope)
 
     fam_members = collections.defaultdict(list)
     for w, e in lex.items():
@@ -377,9 +369,10 @@ def main():
                "wikt_en": "English Wiktionary via kaikki.org (Ylonen 2022), CC BY-SA 4.0",
                "wikt_de": "German Wiktionary via kaikki.org, CC BY-SA 4.0",
                "morphynet": "MorphyNet, Batsuren et al. 2021, CC BY-SA 3.0",
-               "wordfreq": "wordfreq 3, Speer 2022, CC BY-SA 4.0"}
+               "wordfreq": "wordfreq 3, Speer 2022, CC BY-SA 4.0",
+               "german_commons": "case shares from The German Commons sample (Wikipedia, Wikibooks, Wikivoyage, Wikinews, Bundestag minutes, political speeches, Wikisource, DiBiLit; CC BY-SA / CC BY / CC0); counts only"}
     v4 = {"version": 4, "generated": datetime.date.today().isoformat(), "license": "CC BY-SA 4.0", "sources": sources,
-          "scope": {"kind": "top-N content lemmas by frequency (wordfreq)", "n": args.n},
+          "scope": {"kind": "top-N content lemmas by case-aware frequency (wordfreq + German Commons case shares)", "n": args.n},
           "rules": {"pie": "shown only when English and German Wiktionary both give a PIE root (status 'verified')",
                     "families": "present-day derivation families; compounds and causatives are bridges"},
           "families": families, "words": words, "bridges": bridge_list}

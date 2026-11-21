@@ -6,7 +6,7 @@ Tables written to graph.db
   level(word, level, rule, evidence)            level model; evidence = JSON of every input
 
 Level model (transparent rules, commercial-safe inputs only):
-  freq   rank among content lemmas (wordfreq) -> level by the vocabulary sizes per CEFR level reported by
+  freq   rank among content lemmas (wordfreq, case-aware: freq.py) -> level by the vocabulary sizes per CEFR level reported by
          Milton & Alexiou (2009): A1 <1500, A2 <2500, B1 <3250, B2 <3750, C1 <4500, else C2
   dib    Deutsch im Blick (CC BY 4.0), a first-year course: chapters 1-5 -> A1, 6-10 -> A2
   merlin MERLIN learner texts (CC BY-SA 4.0): the lowest rated level at which >= MIN_TEXTS texts at or
@@ -15,7 +15,7 @@ Level model (transparent rules, commercial-safe inputs only):
 """
 import csv, json, re, sqlite3, collections, sys, unicodedata
 from pathlib import Path
-from wordfreq import top_n_list
+import freq
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE.parent / "raw-data" / "v2"
@@ -73,9 +73,28 @@ def lemma_index():
 
 
 def lemmatize(tok, idx):
-    for t in (tok, tok.lower(), tok.capitalize()):
+    """Lemmas of a token from cased text. 'Die' at a sentence start is the article, not the noun; a capitalised
+    spelling that is rare mid-sentence ('Ist' 0.1%, 'Sein' 0.8%) is read as a sentence start too."""
+    if tok.lower() in freq.closed_class(): return set()
+    if tok[:1].isupper() and tok != tok.lower() and freq.share(tok) < 0.1:
+        return idx.get(tok.lower(), set())
+    for t in (tok, tok.lower()):
         if t in idx: return idx[t]
-    return set()
+    # learners write 'haus' for 'Haus'; but 'ist' is not 'Ist', so only for words mostly written capitalised
+    cap = tok.capitalize()
+    return idx[cap] if cap in idx and freq.share(cap) >= 0.5 else set()
+
+
+def lemmatize_folded(tok, idx):
+    """Weighted lemmas of a lowercase token (the subtitle list is case-folded): each spelling gets its case share,
+    so 'leben' counts partly for leben and partly for Leben, and 'die' not at all for the noun Die."""
+    shares = {t: freq.share(t) for t in {tok, tok.capitalize(), tok.upper()} if t in idx}
+    total = max(1.0, sum(shares.values()))   # > 1 only for rare words, where every spelling defaults to 1
+    out = collections.Counter()
+    for t, sh in shares.items():
+        if sh > 0:
+            for l in idx[t]: out[l] += sh / total / len(idx[t])
+    return out
 
 
 def merlin_evidence(idx):
@@ -116,13 +135,7 @@ def dib_evidence():
 
 
 def freq_evidence():
-    by_fold = collections.defaultdict(list)
-    for w in lex: by_fold[w.casefold()].append(w)
-    rank, n = {}, 0
-    for tok in top_n_list("de", 200000):
-        for w in by_fold.get(tok, []):
-            if w not in rank:
-                n += 1; rank[w] = n
+    rank = {w: i for i, w in enumerate(freq.ranked(lex), 1)}
     def lv(r): return "A1" if r < 1500 else "A2" if r < 2500 else "B1" if r < 3250 else "B2" if r < 3750 else "C1" if r < 4500 else "C2"
     return {w: {"rank": r, "level": lv(r)} for w, r in rank.items()}
 
@@ -133,8 +146,7 @@ def subtitle_evidence(idx, thresholds):
     for line in open(RAW / "opensubtitles-de_full.txt", encoding="utf-8"):
         p = line.split()
         if len(p) != 2 or not p[1].isdigit(): continue
-        ls = lemmatize(p[0], idx)
-        for l in ls: counts[l] += int(p[1]) / len(ls)
+        for l, wt in lemmatize_folded(p[0], idx).items(): counts[l] += int(p[1]) * wt
     out = {}
     for r, (w, c) in enumerate(counts.most_common(), 1):
         lv = next((LEVELS[i] for i, t in enumerate(thresholds) if r < t), "C2")

@@ -6,7 +6,8 @@ Scopes
 """
 import json, random, sqlite3, collections, sys
 from pathlib import Path
-from wordfreq import top_n_list, zipf_frequency
+import freq
+from freq import zipf
 
 HERE = Path(__file__).resolve().parent
 G = sqlite3.connect(HERE / "out" / "graph.db")
@@ -21,9 +22,6 @@ edges = G.execute("select base, derived, kind, sources, n_sources, info from edg
 deriv_in = collections.defaultdict(list)
 for b, d, k, s, n, i in edges:
     if k == "deriv": deriv_in[d].append(b)
-
-
-def zipf(w): return zipf_frequency(w, "de")
 
 
 strong_in = collections.defaultdict(list)
@@ -49,14 +47,7 @@ def hist_of(fam):
 # scopes
 old_words = [w["lemma"] for c in OLD["clusters"] for w in c["words"]]
 old_cluster = {w["lemma"]: c["wurzel"]["id"] for c in OLD["clusters"] for w in c["words"]}
-by_fold = collections.defaultdict(list)
-for w in lex: by_fold[w.casefold()].append(w)
-top = []
-for tok in top_n_list("de", 60000):
-    for w in by_fold.get(tok, []):
-        if w not in top: top.append(w)
-    if len(top) >= 5000: break
-top = top[:5000]
+top = freq.ranked(lex, depth=60000)[:5000]
 
 
 def scope_stats(words, name):

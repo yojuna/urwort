@@ -16,6 +16,8 @@ import re
 import sqlite3
 from pathlib import Path
 
+import freq
+
 HERE = Path(__file__).parent
 ROOT = HERE.parent
 
@@ -53,6 +55,8 @@ def candidates(tok):
 
 
 def lemmatise(tok, forms, scope):
+    if tok.replace("ſ", "s").lower() in freq.closed_class():   # function word, also at a sentence start ('Die', 'Ich')
+        return None, False
     for c in candidates(tok.replace("ſ", "s")):
         if c in forms:
             lemmas = forms[c]

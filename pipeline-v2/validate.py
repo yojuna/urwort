@@ -7,6 +7,7 @@ Regression checks pin facts we verified by hand, so a pipeline change cannot sil
 Metrics are reported, not enforced.
 """
 import json, re, sqlite3, sys, collections
+import freq as FQ
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -79,6 +80,13 @@ check("doubted / conflicting PIE never shown",
 check("loans from proto-languages are not asserted",
       not any(f["borrowed_from"] and f["borrowed_from"]["lang_code"].endswith("-pro") for f in F.values()))
 
+# --- frequency: case-folding bug (audit 2026-10-31) ---------------------------------------------
+in_scope = [w for w, d in W.items() if d["in_scope"]]
+twins = [w for w in in_scope if w != w.casefold() and w.casefold() in FQ.closed_class()]
+check("no capitalised twin of a function word in scope (Die, Ich, DAS)", not twins, f"{len(twins)}: {twins[:8]}")
+caps = [w for w in in_scope if FQ.is_allcaps(w) and FQ.share(w) < 0.5]
+check("no all-caps word in scope unless mostly written that way", not caps, f"{len(caps)}: {caps[:8]}")
+
 # --- regression: facts verified by hand on 2026-10-03 --------------------------------------------
 def fam(w): return F[W[w]["family"]] if w in W else None
 def same(a, b): return a in W and b in W and W[a]["family"] == W[b]["family"]
@@ -101,6 +109,13 @@ REG = [
     ("leben and das Leben are one family (conversion)", same("leben", "Leben")),
     ("haben and das Haben are one family (conversion)", same("haben", "Haben") if "Haben" in W else True),
     ("gehen has English cognate go", (fam("gehen")["cognates"].get("en") or {}).get("form") == "go"),
+    # frequency fix, 2026-11-21
+    ("Die, DAS, Ich, Des are not in scope", not any(W.get(w, {}).get("in_scope") for w in ("Die", "DAS", "Ich", "Des"))),
+    ("Zeit, Jahr, Mann, Macht are in scope (no noun eaten by the filter)", all(W.get(w, {}).get("in_scope") for w in ("Zeit", "Jahr", "Mann", "Macht"))),
+    ("Leben and leben are both in scope", all(W.get(w, {}).get("in_scope") for w in ("Leben", "leben"))),
+    ("Zeit ranks in the top 100", (W.get("Zeit", {}).get("rank") or 10**6) <= 100),
+    ("weinen is in scope (not drowned out by Weinen, plural of Wein)", W.get("weinen", {}).get("in_scope")),
+    ("das Ist is not rated A1 (sentence-initial 'Ist ...?' is the verb)", W.get("Ist", {}).get("level") != "A1"),
 ]
 for name, ok in REG:
     check(name, ok, kind="regression")
@@ -118,6 +133,7 @@ metrics = {
     "history_stages_total": sum(len(f["history"]) for f in F.values()),
     "pie_status": dict(pie), "levels": dict(levels),
     "english_cognates": sum("en" in f["cognates"] for f in F.values()),
+    "closed_class_words": len(FQ.closed_class()), "allcaps_in_scope": sum(FQ.is_allcaps(w) for w in in_scope),
     "english_cognates_expert_checked": sum("iecor" in (f["cognates"].get("en") or {}).get("sources", []) for f in F.values()),
 }
 out = {"results": results, "metrics": metrics}

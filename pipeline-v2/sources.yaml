@@ -20,3 +20,6 @@ klexikon:    {url: "https://huggingface.co/datasets/dennlinger/klexikon", licens
 opensubtitles_freq: {url: "https://github.com/hermitdave/FrequencyWords", license: CC BY-SA 4.0, use: ship,
               cite: "Lison & Tiedemann (2016) OpenSubtitles2016. LREC"}
 goethe_lists: {url: "https://www.goethe.de/", license: "© Goethe-Institut", use: check, note: "evaluation of the level model only (goethe_check.py)"}
+german_commons: {url: "https://huggingface.co/datasets/coral-nlp/german-commons", license: "per document: CC BY-SA 4.0 / CC BY 2.5 / CC0 (sample used)", use: ship,
+              note: "case-sensitive counts only (case_counts.py -> freq.py); sources Wikipedia, Wikibooks, Wikivoyage, Wikinews, Bundestag minutes, German Political Speeches, Wikisource, DiBiLit",
+              cite: "Gienapp et al. (2025) The German Commons. arXiv"}

@@ -30,6 +30,18 @@ get https://raw.githubusercontent.com/ghrgriner/deutsch-im-blick/main/output/dec
 get "https://clarin.eurac.edu/repository/xmlui/bitstream/handle/20.500.12124/59/merlin-text-v1.2.zip?sequence=17&isAllowed=y" merlin-text-v1.2.zip
 get https://huggingface.co/datasets/dennlinger/klexikon/resolve/main/data/train.json klexikon-train.json
 get https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/de/de_full.txt opensubtitles-de_full.txt
+# The German Commons sample (~1.6 GB; CC BY-SA / CC BY / CC0 per document): case-sensitive counts for freq.py
+GC=https://huggingface.co/datasets/coral-nlp/german-commons/resolve/main
+mkdir -p german-commons
+get "$GC/subset=Web/source=Wikipedia/part-0001.parquet" german-commons/Wikipedia.parquet
+get "$GC/subset=Political/source=Plenarprotokolle%20des%20Bundestages/part-0001.parquet" german-commons/Plenarprotokolle_des_Bundestages.parquet
+get "$GC/subset=Political/source=German%20Political%20Speeches/part-0001.parquet" german-commons/German_Political_Speeches.parquet
+get "$GC/subset=News/source=Wikinews/part-0001.parquet" german-commons/Wikinews.parquet
+get "$GC/subset=Cultural/source=Wikivoyage/part-0001.parquet" german-commons/Wikivoyage.parquet
+get "$GC/subset=Scientific/source=Wikibooks/part-0001.parquet" german-commons/Wikibooks.parquet
+# narrative prose (story vocabulary: weinen, schau), 18th-19th century
+get "$GC/subset=Cultural/source=Wikisource/part-0001.parquet" german-commons/Wikisource.parquet
+get "$GC/subset=Cultural/source=DiBiLit/part-0001.parquet" german-commons/DiBiLit.parquet
 # CHECK ONLY (copyrighted, never shipped): Goethe-Institut word lists, to evaluate our level estimates
 mkdir -p check
 get https://www.goethe.de/pro/relaunch/prf/de/A1_SD1_Wortliste_02.pdf check/goethe-A1.pdf
