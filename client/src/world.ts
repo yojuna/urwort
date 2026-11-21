@@ -1,7 +1,8 @@
-// The explorable world: one Phaser scene that loads any SceneDef from maps.ts.
+// The explorable world: one Phaser scene that loads any level of the LDtk project (src/ldtk.ts).
 import Phaser from 'phaser';
-import { SCENES, type Npc, type SceneDef } from './maps';
-import { SOLID, makeTextures, npcTexture, tileKey } from './art';
+import { SCENES, type Npc, type SceneDef, type Tile } from './ldtk';
+import { makeTextures, npcTexture } from './art';
+import { TILE_ID } from './pixels';
 import { state, save } from './state';
 import { isRunning, play, type StoryHost } from './story';
 import { addSlip, titleCard } from './ui/cards';
@@ -9,11 +10,11 @@ import { toast } from './ui/dom';
 
 const T = 16;
 const STEP_MS = 140;
+const ABOVE_DEPTH = 50;   // the Above layer covers characters (depth = row + 0.5) but not the tap marker
 
 export class World extends Phaser.Scene implements StoryHost {
   def!: SceneDef;
-  rows: string[] = [];
-  tiles: Phaser.GameObjects.Image[][] = [];
+  objectTiles: { img: Phaser.GameObjects.Image; tile: Tile }[] = [];
   player!: Phaser.GameObjects.Image;
   px = 0;
   py = 0;
@@ -25,21 +26,19 @@ export class World extends Phaser.Scene implements StoryHost {
 
   constructor() { super('world'); }
 
+  preload() {
+    if (!this.textures.exists('tiles')) this.load.spritesheet('tiles', './maps/tiles.png', { frameWidth: T, frameHeight: T });
+  }
+
   create(data: { scene?: string; x?: number; y?: number }) {
     makeTextures(this);
     const id = data.scene ?? state.scene;
     this.def = SCENES[id] ?? SCENES.study;
-    this.rows = this.def.rows.map((r) => r);
     this.npcs = [];
-    this.tiles = [];
-    for (let y = 0; y < this.rows.length; y++) {
-      this.tiles.push([]);
-      for (let x = 0; x < this.rows[y].length; x++) {
-        const ch = this.rows[y][x];
-        if (ch === 'T' || ch === 'm') this.add.image(x * T + 8, y * T + 8, tileKey(','));
-        this.tiles[y].push(this.add.image(x * T + 8, y * T + 8, tileKey(ch)));
-      }
-    }
+    const draw = (t: Tile, depth = 0) => this.add.image(t.x * T + 8, t.y * T + 8, 'tiles', t.t).setDepth(depth);
+    for (const t of this.def.ground) draw(t);
+    this.objectTiles = this.def.objects.map((tile) => ({ img: draw(tile), tile: { ...tile } }));
+    for (const t of this.def.above) draw(t, ABOVE_DEPTH);
     if (state.flags['gold_' + id]) this.gold(true);
 
     const start = data.x !== undefined ? [data.x, data.y!] : (data.scene ? this.def.start : [state.x, state.y]);
@@ -49,7 +48,7 @@ export class World extends Phaser.Scene implements StoryHost {
     this.marker = this.add.image(0, 0, 'marker').setVisible(false).setDepth(100);
 
     const cam = this.cameras.main;
-    const w = this.rows[0].length * T, h = this.rows.length * T;
+    const w = this.def.w * T, h = this.def.h * T;
     const fit = () => {
       const zoom = Math.max(2, Math.round(Math.min(this.scale.width / (T * 8), this.scale.height / (T * 10))));
       cam.setZoom(zoom);
@@ -105,8 +104,7 @@ export class World extends Phaser.Scene implements StoryHost {
   }
 
   walkable(x: number, y: number) {
-    const ch = this.rows[y]?.[x];
-    if (ch === undefined || SOLID.has(ch)) return false;
+    if (x < 0 || y < 0 || x >= this.def.w || y >= this.def.h || this.def.solid[y * this.def.w + x]) return false;
     return !this.npcs.some((n) => n.def.x === x && n.def.y === y);
   }
 
@@ -221,13 +219,8 @@ export class World extends Phaser.Scene implements StoryHost {
   // ---- StoryHost
 
   gold(silent = false) {
-    for (let y = 0; y < this.rows.length; y++) {
-      for (let x = 0; x < this.rows[y].length; x++) {
-        if (this.rows[y][x] === 'S') {
-          this.rows[y] = this.rows[y].slice(0, x) + 'g' + this.rows[y].slice(x + 1);
-          this.tiles[y][x].setTexture(tileKey('g'));
-        }
-      }
+    for (const o of this.objectTiles) {
+      if (o.tile.t === TILE_ID.S) { o.tile.t = TILE_ID.g; o.img.setFrame(TILE_ID.g); }
     }
     state.flags['gold_' + this.def.id] = true;
     if (!silent) this.cameras.main.flash(500, 255, 230, 120);

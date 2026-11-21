@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ink": "node scripts/compile-ink.mjs",
+    "tiles": "node scripts/make-tileset.ts",
     "dev": "npm run ink && vite",
     "build": "npm run ink && tsc --noEmit && vite build",
     "preview": "vite preview"

@@ -1,6 +1,6 @@
 """Export the word data for the client prototype from the dialogue and maps.
 
-Collects every word used in client/src/story/main.ink and client/src/maps.ts, lemmatises it
+Collects every word used in client/src/story/main.ink and the LDtk maps (client/public/maps/urwort.ldtk), lemmatises it
 (UniMorph lookup, as in tales_coverage.py), and writes client/public/data/slice.json:
 words (glosses, IPA, audio, level, family, history, a quotation from the tales),
 inflected forms -> lemma (for tappable words), and rune edges (base + affix -> derived,
@@ -77,9 +77,12 @@ def main():
 
     ink = (CLIENT / "src/story/main.ink").read_text(encoding="utf-8")
     ink = "\n".join(l for l in ink.splitlines() if not l.strip().startswith("//"))
-    maps = (CLIENT / "src/maps.ts").read_text(encoding="utf-8")
-    lines = ink_text(ink) + re.findall(r"label: '([^']*)'", maps)
-    explicit = set(re.findall(r"slip:([^\s#]+)", ink)) | set(re.findall(r"slip: '([^']+)'", maps))
+    ldtk = json.load(open(CLIENT / "public/maps/urwort.ldtk", encoding="utf-8"))
+    obj_fields = [{f["__identifier"]: f["__value"] for f in e["fieldInstances"]}
+                  for lv in ldtk["levels"] for li in lv["layerInstances"] or [] for e in li["entityInstances"]
+                  if e["__identifier"] == "Obj"]
+    lines = ink_text(ink) + [f["label"] for f in obj_fields if f.get("label")]
+    explicit = set(re.findall(r"slip:([^\s#]+)", ink)) | {f["slip"] for f in obj_fields if f.get("slip")}
     puzzles = re.findall(r"puzzle:([^,\s]+),([^,\s]+),([^\s#]+)", ink)
     explicit |= {p[0] for p in puzzles} | {p[2] for p in puzzles}
 

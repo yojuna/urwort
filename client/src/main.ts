@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import './style.css';
 import { loadData } from './data';
+import { loadMaps } from './ldtk';
 import { World } from './world';
 import { hud } from './ui/cards';
 import { el, modal } from './ui/dom';
@@ -19,7 +20,7 @@ function menu() {
 }
 
 async function boot() {
-  await loadData();
+  await Promise.all([loadData(), loadMaps()]);
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
